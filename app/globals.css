@@ -1,0 +1,119 @@
+﻿:root {
+  color-scheme: light;
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --text: #152034;
+  --muted: #5f6a80;
+  --line: #d9dfec;
+  --accent: #1f6feb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", "Noto Sans JP", sans-serif;
+  background: radial-gradient(circle at top right, #e6eefc, var(--bg) 42%);
+  color: var(--text);
+}
+
+.page {
+  min-height: 100dvh;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+  grid-template-rows: 1fr;
+}
+
+.notice,
+.frameWrap {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 12px 36px rgba(24, 41, 74, 0.06);
+}
+
+.notice {
+  align-self: center;
+  justify-self: center;
+  width: min(100%, 420px);
+}
+
+.notice h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.notice p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.noticeText {
+  margin-bottom: 12px !important;
+}
+
+.noticeError {
+  margin-top: 12px !important;
+  color: #a02135 !important;
+  font-weight: 600;
+}
+
+.googleButton {
+  min-height: 44px;
+}
+
+.frame {
+  display: block;
+  width: 100%;
+  min-height: 72dvh;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.appShell {
+  position: relative;
+  min-height: calc(100dvh - 48px);
+}
+
+.frameFullscreen {
+  min-height: calc(100dvh - 48px);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(24, 41, 74, 0.12);
+}
+
+.floatingSignOut {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  border: 1px solid rgba(217, 223, 236, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 10px;
+  }
+
+  .frame {
+    min-height: calc(100dvh - 20px);
+  }
+
+  .frameFullscreen {
+    min-height: calc(100dvh - 20px);
+    border-radius: 14px;
+  }
+}
