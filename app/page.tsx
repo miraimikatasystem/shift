@@ -73,10 +73,10 @@ function toUserMessage(error: unknown): string {
   }
 
   if (error.status === 401) {
-    return "認証に失敗しました。Googleで再ログインしてください。";
+    return error.message || "認証に失敗しました。Googleで再ログインしてください。";
   }
   if (error.status === 403) {
-    return "このGoogleアカウントにはアクセス権限がありません。";
+    return error.message || "このGoogleアカウントにはアクセス権限がありません。";
   }
   if (error.status === 0) {
     return "ネットワークエラーが発生しました。接続を確認してください。";
