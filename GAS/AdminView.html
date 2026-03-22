@@ -113,6 +113,7 @@
         <option value="稼働中" selected>稼働中</option>
         <option value="申請中">申請中</option>
         <option value="休職">休職</option>
+        <option value="退職">退職</option>
       </select>
     </div>
     <div id="admin-staff-list"><div style="font-size:12px; color:#ccc; text-align:center;">読み込み中...</div></div>
@@ -165,6 +166,10 @@
       return String(value || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[c]));
     }
 
+    function escapeJsArg(value) {
+      return JSON.stringify(String(value == null ? '' : value)).replace(/'/g, '&#39;');
+    }
+
     function loadData(targetRecruitId) {
       adminRunner('システムエラー')
       .withSuccessHandler(data => {
@@ -210,8 +215,15 @@
          staffBox.innerHTML = filtered.map(s => {
            let statusColor = s.status === '稼働中' ? 'var(--green)' : (s.status === '申請中' ? 'var(--orange)' : '#ccc');
            let statusTextColor = s.status === '稼働中' ? 'var(--green-text)' : (s.status === '申請中' ? '#fff' : '#666');
-           let safeNote = (s.note||'').replace(/'/g, "\\'").replace(/\n/g, " ");
-           return `<div class="card" onclick="openStaffEditModal('${s.name}', '${s.phone}', '${s.email}', '${s.status}', '${s.role}', '${safeNote}')" style="cursor:pointer;"><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-weight:bold; font-size:16px;">${s.name} <span style="font-size:10px; color:#888; font-weight:normal;">${s.role}</span></div><span style="background:${statusColor}; color:${statusTextColor}; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold;">${s.status}</span></div><div style="font-size:11px; color:#888; margin-top:5px;">☎ ${s.phone} | ✉ ${s.email}</div></div>`;
+           const modalArgs = [
+             escapeJsArg(s.name),
+             escapeJsArg(s.phone),
+             escapeJsArg(s.email),
+             escapeJsArg(s.status),
+             escapeJsArg(s.role),
+             escapeJsArg(s.note || '')
+           ].join(', ');
+           return `<div class="card" onclick='openStaffEditModal(${modalArgs})' style="cursor:pointer;"><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-weight:bold; font-size:16px;">${escapeHtmlText(s.name)} <span style="font-size:10px; color:#888; font-weight:normal;">${escapeHtmlText(s.role)}</span></div><span style="background:${statusColor}; color:${statusTextColor}; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold;">${escapeHtmlText(s.status)}</span></div><div style="font-size:11px; color:#888; margin-top:5px;">☎ ${escapeHtmlText(s.phone)} | ✉ ${escapeHtmlText(s.email)}</div></div>`;
          }).join('');
       }
     }
@@ -447,8 +459,20 @@
     function openConfirmModal(title, msg, btnText, actionCode) { showModal(`<div style="font-weight:bold; color:var(--main-blue); margin-bottom:15px; font-size:18px;">${title}</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:20px; text-align:left; background:#f9f9f9; padding:15px; border-radius:10px;">${msg}</div><button class="btn-main" onclick="${actionCode}; closeModal();">${btnText}</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>`); }
     function openAlertModal(title, msg) { showModal(`<div style="font-weight:bold; color:var(--red-text); margin-bottom:15px; font-size:18px;">${title}</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:20px; text-align:left; background:#fce8e6; padding:15px; border-radius:10px;">${msg}</div><button class="btn-cancel" onclick="closeModal()">閉じる</button>`); }
 
-    function openStaffEditModal(name, tel, mail, status, role, note) { showModal(`<div style="font-weight:bold; color:var(--main-blue); margin-bottom:10px; font-size:18px;">スタッフ情報</div><div style="font-weight:bold; font-size:20px; margin-bottom:15px;">${name}</div><div style="display:flex; gap:10px; margin-bottom:15px;"><a href="tel:${tel}" style="flex:1; background:#e6f4ea; color:#137333; text-decoration:none; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; display:inline-block;">📞 電話</a><a href="mailto:${mail}" style="flex:1; background:#f0f8ff; color:#1a73e8; text-decoration:none; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; display:inline-block;">✉️ メール</a></div><div style="text-align:left;"><div style="font-size:11px; font-weight:bold; color:#888;">ステータス</div><select id="es-status" style="margin-bottom:10px;"><option ${status==='稼働中'?'selected':''}>稼働中</option><option ${status==='申請中'?'selected':''}>申請中</option><option ${status==='休職'?'selected':''}>休職</option><option ${status==='退職'?'selected':''}>退職</option></select><div style="font-size:11px; font-weight:bold; color:#888;">管理者記入欄</div><input type="text" id="es-role" value="${role}" style="margin-bottom:10px;"><div style="font-size:11px; font-weight:bold; color:#888;">コメント</div><textarea id="es-note" rows="2" style="margin-bottom:15px;">${note}</textarea></div><button class="btn-main" onclick="executeStaffEdit('${name}')">💾 保存する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">閉じる</button>`); }
+    function openStaffEditModal(name, tel, mail, status, role, note) {
+      const safeName = escapeHtmlText(name);
+      const safeTel = escapeHtmlText(tel);
+      const safeMail = escapeHtmlText(mail);
+      const safeRole = escapeHtmlText(role);
+      const safeNote = escapeHtmlText(note);
+      const nameArg = escapeJsArg(name);
+      showModal(`<div style="font-weight:bold; color:var(--main-blue); margin-bottom:10px; font-size:18px;">スタッフ情報</div><div style="font-weight:bold; font-size:20px; margin-bottom:15px;">${safeName}</div><div style="display:flex; gap:10px; margin-bottom:15px;"><a href="tel:${safeTel}" style="flex:1; background:#e6f4ea; color:#137333; text-decoration:none; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; display:inline-block;">📞 電話</a><a href="mailto:${safeMail}" style="flex:1; background:#f0f8ff; color:#1a73e8; text-decoration:none; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; display:inline-block;">✉️ メール</a></div><div style="text-align:left;"><div style="font-size:11px; font-weight:bold; color:#888;">ステータス</div><select id="es-status" style="margin-bottom:10px;"><option ${status==='稼働中'?'selected':''}>稼働中</option><option ${status==='申請中'?'selected':''}>申請中</option><option ${status==='休職'?'selected':''}>休職</option><option ${status==='退職'?'selected':''}>退職</option></select><div style="font-size:11px; font-weight:bold; color:#888;">管理者記入欄</div><input type="text" id="es-role" value="${safeRole}" style="margin-bottom:10px;"><div style="font-size:11px; font-weight:bold; color:#888;">コメント</div><textarea id="es-note" rows="2" style="margin-bottom:15px;">${safeNote}</textarea></div><button class="btn-main" onclick='executeStaffEdit(${nameArg})'>💾 保存する</button><button class="btn-cancel" style="color:var(--red-text); border-color:var(--red-text);" onclick='confirmStaffDelete(${nameArg})'>🗑️ 削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">閉じる</button>`);
+    }
     function executeStaffEdit(name) { doToast('更新中...'); closeModal(); adminRunner('更新エラー').withSuccessHandler(r=>{doToast(r.message);loadData(currentRecruitId);}).updateAdminStaffStatus(name, document.getElementById('es-status').value, document.getElementById('es-role').value, document.getElementById('es-note').value, SESSION_TOKEN); }
+    function confirmStaffDelete(name) {
+      showModal(`<div style="font-weight:bold; color:var(--red-text); margin-bottom:12px; font-size:18px;">スタッフを削除</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:12px;">${escapeHtmlText(name)} を削除しますか？</div><div style="font-size:12px; color:#666; background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px;">スタッフ一覧から物理削除はせず、ステータスを「退職」に変更して Google ログイン許可も外します。過去のシフト履歴は残ります。</div><button class="btn-main" style="background:var(--red-text);" onclick='executeStaffDelete(${escapeJsArg(name)})'>削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>`);
+    }
+    function executeStaffDelete(name) { doToast('削除中...'); closeModal(); adminRunner('削除エラー').withSuccessHandler(r=>{doToast(r.message);loadData(currentRecruitId);}).deleteAdminStaff(name, SESSION_TOKEN); }
     
     function addException() { const list = document.getElementById('exception-list'); if(!list) return; const div = document.createElement('div'); const uid = Date.now(); div.style.cssText = 'background:#f9f9f9; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #eee;'; div.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><input type="date" style="width:130px; padding:6px; font-size:12px; margin:0;"><select onchange="document.getElementById('tb-${uid}').style.display = this.value === 'close' ? 'none' : 'flex'" style="width:110px; padding:6px; font-size:12px; margin:0;"><option value="short">時間変更</option><option value="close">休業(終日)</option></select><button onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:var(--red-text); font-weight:bold;">✖</button></div><div id="tb-${uid}" style="display:flex; gap:5px; align-items:center;"><input type="time" style="flex:1; padding:6px; font-size:12px; margin:0;"><span style="font-size:12px; color:#888;">〜</span><input type="time" style="flex:1; padding:6px; font-size:12px; margin:0;"></div>`; list.appendChild(div); }
     function confirmStartRecruit() { openConfirmModal('📢 募集開始', '新しいシフトの募集を開始し、スタッフ全員に通知を送りますか？', '募集開始', 'executeStartRecruit()'); }

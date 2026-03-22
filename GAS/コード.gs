@@ -287,6 +287,21 @@ function getAllowedEmailEntries_() {
   return entries;
 }
 
+function _removeAllowedEmailEntriesByEmail_(email) {
+  const normalized = _normalizeEmail_(email);
+  if (!normalized) return 0;
+  const sheet = ensureAllowedEmailsSheet_();
+  const data = sheet.getDataRange().getDisplayValues();
+  let removed = 0;
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (_normalizeEmail_(data[i][1]) === normalized) {
+      sheet.deleteRow(i + 1);
+      removed++;
+    }
+  }
+  return removed;
+}
+
 function _copyBaseMasterSheet_(sourceSs, targetSs, sheetName) {
   const sourceSheet = sourceSs.getSheetByName(sheetName);
   if (!sourceSheet) throw new Error('コピー元にシートがありません: ' + sheetName);
@@ -559,7 +574,10 @@ function sendWNotice_(staffName, title, body) {
     const staffData = ss.getSheetByName('スタッフ一覧').getDataRange().getDisplayValues();
     let targets = [];
     if (staffName === '全員') targets = staffData.filter((r, i) => i > 0 && r[0] === '稼働中' && r[4]).map(r => r[4]);
-    else { let s = staffData.find((r, i) => i > 0 && r[1] === staffName && r[4]); if (s) targets.push(s[4]); }
+    else {
+      let s = staffData.find((r, i) => i > 0 && r[0] === '稼働中' && r[1] === staffName && r[4]);
+      if (s) targets.push(s[4]);
+    }
 
     if (targets.length > 0) {
       MailApp.sendEmail({
@@ -1054,6 +1072,27 @@ function updateAdminStaffStatus(name, status, role, note, sessionToken) {
     }
   }
   return { success: false, message: "エラー" };
+}
+
+function deleteAdminStaff(name, sessionToken) {
+  _requireAdminSession_(sessionToken);
+  const ss = SpreadsheetApp.openById(BASE_SS_ID);
+  const sheet = ss.getSheetByName('スタッフ一覧');
+  if (!sheet) return { success: false, message: 'スタッフ一覧が見つかりません' };
+
+  const data = sheet.getDataRange().getDisplayValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] == name) {
+      const email = _normalizeEmail_(data[i][4]);
+      sheet.getRange(i + 1, 1).setValue('退職');
+      const removedCount = _removeAllowedEmailEntriesByEmail_(email);
+      return {
+        success: true,
+        message: removedCount > 0 ? '退職に変更し、Googleログイン許可も解除しました' : '退職に変更しました'
+      };
+    }
+  }
+  return { success: false, message: '対象スタッフが見つかりません' };
 }
 
 function saveReqDefaults(recruitId, defaults, sessionToken) {
