@@ -583,10 +583,10 @@ function authenticateAdmin(password, sessionToken) {
 
   const session = _createSession_('admin', 'admin');
   const baseUrl = ScriptApp.getService().getUrl();
-  if (!baseUrl) return { success: false, message: 'WebアプリURLを取得できませんでした' };
   return {
     success: true,
-    redirectUrl: baseUrl + '?view=admin&st=' + encodeURIComponent(session.token)
+    adminSessionToken: session.token,
+    redirectUrl: baseUrl ? (baseUrl + '?view=admin&st=' + encodeURIComponent(session.token)) : ''
   };
 }
 

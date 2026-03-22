@@ -374,7 +374,20 @@
           openAlertModal('エラー', (res && res.message) ? res.message : 'ログインできませんでした');
           return;
         }
-        window.location.href = res.redirectUrl;
+        if (res.adminSessionToken) {
+          try {
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({ type: 'gas-switch-admin', sessionToken: res.adminSessionToken }, '*');
+              closeModal();
+              return;
+            }
+          } catch (e) {}
+        }
+        if (res.redirectUrl) {
+          window.location.href = res.redirectUrl;
+          return;
+        }
+        openAlertModal('エラー', '管理画面への切り替え先を取得できませんでした');
       }).authenticateAdmin(password, SESSION_TOKEN);
     }
 

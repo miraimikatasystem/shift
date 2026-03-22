@@ -92,6 +92,7 @@ export default function Page() {
   const [errorMessage, setErrorMessage] = useState("");
   const [sessionToken, setSessionToken] = useState("");
   const [idToken, setIdToken] = useState("");
+  const [iframeView, setIframeView] = useState<"staff" | "admin">("staff");
   const buttonRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bootstrapFormRef = useRef<HTMLFormElement | null>(null);
@@ -138,12 +139,19 @@ export default function Page() {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
+      if (event.data?.type === "gas-switch-admin" && event.data?.sessionToken) {
+        submittedSessionRef.current = "";
+        setIframeView("admin");
+        setSessionToken(String(event.data.sessionToken));
+        return;
+      }
       if (event.data?.type !== "gas-session-expired") return;
 
       submittedSessionRef.current = "";
       setUser(null);
       setIdToken("");
       setSessionToken("");
+      setIframeView("staff");
       setAuthState("signed_out");
       setErrorMessage("セッションの有効期限が切れました。Googleで再ログインしてください。");
     };
@@ -209,6 +217,7 @@ export default function Page() {
     setUser(null);
     setIdToken("");
     setSessionToken("");
+    setIframeView("staff");
     setErrorMessage("");
     setAuthState("signed_out");
   };
@@ -248,6 +257,7 @@ export default function Page() {
         <section className="appShell">
           <form ref={bootstrapFormRef} action={gasUrl} method="post" target="gas-app-frame" hidden>
             <input type="hidden" name="bootstrapSessionToken" value={sessionToken} />
+            <input type="hidden" name="view" value={iframeView} />
           </form>
           <button type="button" onClick={handleSignOut} className="floatingSignOut">
             Sign out
