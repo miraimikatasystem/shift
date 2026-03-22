@@ -10,10 +10,6 @@ const SESSION_TTL_SEC = 60 * 60;
 const BASE_MASTER_SHEET_NAMES = ['スタッフ一覧', '募集履歴一覧', 'お知らせ'];
 const ALLOWED_EMAILS_SHEET_NAME = 'アクセス許可メール';
 const ALLOWED_EMAILS_SHEET_HEADER = ['有効', 'メールアドレス', 'メモ', '更新日時', '更新者'];
-const ALLOWED_EMAILS = [
-  'ayukiofumiria@gmail.com',
-  'mirai.mikata.system@gmail.com'
-];
 
 function doPost(e) {
   const bootstrapSessionToken = e && e.parameter ? String(e.parameter.bootstrapSessionToken || '') : '';
@@ -256,7 +252,6 @@ function _isEmailEnabledValue_(value) {
 function ensureAllowedEmailsSheet_() {
   const ss = SpreadsheetApp.openById(BASE_SS_ID);
   let sheet = ss.getSheetByName(ALLOWED_EMAILS_SHEET_NAME);
-  let shouldSeedDefaults = false;
   if (!sheet) sheet = ss.insertSheet(ALLOWED_EMAILS_SHEET_NAME);
 
   const headerRange = sheet.getRange(1, 1, 1, ALLOWED_EMAILS_SHEET_HEADER.length);
@@ -264,18 +259,6 @@ function ensureAllowedEmailsSheet_() {
   if (currentHeader.join('') !== ALLOWED_EMAILS_SHEET_HEADER.join('')) {
     sheet.clearContents();
     headerRange.setValues([ALLOWED_EMAILS_SHEET_HEADER]);
-    shouldSeedDefaults = true;
-  }
-  if (sheet.getLastRow() <= 1) shouldSeedDefaults = true;
-
-  if (shouldSeedDefaults) {
-    const seedRows = ALLOWED_EMAILS
-      .map(function(email) { return _normalizeEmail_(email); })
-      .filter(String)
-      .map(function(email) { return ['有効', email, '初期登録', new Date(), 'system']; });
-    if (seedRows.length > 0) {
-      sheet.getRange(2, 1, seedRows.length, seedRows[0].length).setValues(seedRows);
-    }
   }
 
   return sheet;
