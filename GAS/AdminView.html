@@ -126,6 +126,17 @@
         <button class="btn-main" style="margin:0; flex:1;" onclick="saveAllowedEmailsFromAdmin()">保存</button>
       </div>
     </div>
+    <div class="card">
+      <div style="font-weight:bold; color:#555; margin-bottom:8px;">管理者パスワード変更</div>
+      <div style="font-size:12px; color:#888; margin-bottom:12px;">保存先はシートではなく Apps Script の Script Properties です。</div>
+      <div style="font-size:11px; color:#888;">現在のパスワード</div>
+      <input type="password" id="admin-password-current" autocomplete="current-password">
+      <div style="font-size:11px; color:#888;">新しいパスワード</div>
+      <input type="password" id="admin-password-next" autocomplete="new-password">
+      <div style="font-size:11px; color:#888;">新しいパスワード（確認）</div>
+      <input type="password" id="admin-password-confirm" autocomplete="new-password">
+      <button class="btn-main" onclick="saveAdminPasswordFromAdmin()">パスワードを変更</button>
+    </div>
   </div>
 
   <div id="toast"></div><div id="overlay" class="overlay"><div id="modal-box" class="modal"></div></div> 
@@ -292,6 +303,21 @@
         adminData.allowedEmails = Array.isArray(r.emails) ? r.emails : rows;
         renderAllowedEmailManager();
       }).saveAllowedEmails(rows, SESSION_TOKEN);
+    }
+
+    function saveAdminPasswordFromAdmin() {
+      const currentPassword = String(document.getElementById('admin-password-current')?.value || '');
+      const nextPassword = String(document.getElementById('admin-password-next')?.value || '');
+      const confirmPassword = String(document.getElementById('admin-password-confirm')?.value || '');
+      if (!currentPassword) return openAlertModal('入力エラー', '現在のパスワードを入力してください');
+      if (!nextPassword) return openAlertModal('入力エラー', '新しいパスワードを入力してください');
+      if (nextPassword !== confirmPassword) return openAlertModal('入力エラー', '新しいパスワードの確認が一致しません');
+      adminRunner('保存エラー').withSuccessHandler(r => {
+        doToast(r.message);
+        document.getElementById('admin-password-current').value = '';
+        document.getElementById('admin-password-next').value = '';
+        document.getElementById('admin-password-confirm').value = '';
+      }).saveAdminPassword(currentPassword, nextPassword, SESSION_TOKEN);
     }
 
     function onSelectRecruit(selElem) { currentRecruitId = selElem.value; loadData(currentRecruitId); }

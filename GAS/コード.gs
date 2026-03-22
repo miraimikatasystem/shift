@@ -3,13 +3,21 @@ const LEGACY_BASE_SS_ID = '1P7nz8hmV0MtG6lg88JlivMBAwzglV64_PQh-Jlw2FfQ';
 const BASE_SS_ID = '1aS_u3Fyj2jwY_Obcrb19iCFcrOF1k2Iy92lcqXkaLzA';
 const TEMPLATE_SS_ID = '1CDL3xOVAvdxrcX30bNyEPdUVqeri83OcIt0wIaA2QOY';
 const FOLDER_ID = '1AWL9D8mbZXeIQIEIHT-jlpiXKRFJxgAb';
-const ADMIN_PASSWORD = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD') || '';
+const ADMIN_PASSWORD_PROPERTY_KEY = 'ADMIN_PASSWORD';
 const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
 const GOOGLE_OAUTH_CLIENT_ID = PropertiesService.getScriptProperties().getProperty('GOOGLE_OAUTH_CLIENT_ID') || '';
 const SESSION_TTL_SEC = 60 * 60;
 const BASE_MASTER_SHEET_NAMES = ['スタッフ一覧', '募集履歴一覧', 'お知らせ'];
 const ALLOWED_EMAILS_SHEET_NAME = 'アクセス許可メール';
 const ALLOWED_EMAILS_SHEET_HEADER = ['有効', 'メールアドレス', 'メモ', '更新日時', '更新者'];
+
+function getAdminPassword_() {
+  return PropertiesService.getScriptProperties().getProperty(ADMIN_PASSWORD_PROPERTY_KEY) || '';
+}
+
+function setAdminPassword_(password) {
+  PropertiesService.getScriptProperties().setProperty(ADMIN_PASSWORD_PROPERTY_KEY, String(password || ''));
+}
 
 function doPost(e) {
   const bootstrapSessionToken = e && e.parameter ? String(e.parameter.bootstrapSessionToken || '') : '';
@@ -601,8 +609,9 @@ function verifyStaffPin(name, pin, sessionToken) {
 
 function authenticateAdmin(password, sessionToken) {
   const session = _requireSession_(sessionToken);
-  if (!ADMIN_PASSWORD) return { success: false, message: '管理者パスワードが未設定です。Script Properties に ADMIN_PASSWORD を設定してください。' };
-  if (String(password || '') !== ADMIN_PASSWORD) return { success: false, message: 'パスワードが違います' };
+  const adminPassword = getAdminPassword_();
+  if (!adminPassword) return { success: false, message: '管理者パスワードが未設定です。Script Properties に ADMIN_PASSWORD を設定してください。' };
+  if (String(password || '') !== adminPassword) return { success: false, message: 'パスワードが違います' };
 
   session.role = 'admin';
   session.expiresAt = Date.now() + (SESSION_TTL_SEC * 1000);
@@ -613,6 +622,21 @@ function authenticateAdmin(password, sessionToken) {
     adminSessionToken: sessionToken,
     redirectUrl: baseUrl ? (baseUrl + '?view=admin&st=' + encodeURIComponent(sessionToken)) : ''
   };
+}
+
+function saveAdminPassword(currentPassword, newPassword, sessionToken) {
+  _requireAdminSession_(sessionToken);
+  const adminPassword = getAdminPassword_();
+  const nextPassword = String(newPassword || '');
+
+  if (!adminPassword) return { success: false, message: '現在の管理者パスワードが未設定です' };
+  if (String(currentPassword || '') !== adminPassword) return { success: false, message: '現在のパスワードが違います' };
+  if (!nextPassword.trim()) return { success: false, message: '新しいパスワードを入力してください' };
+  if (nextPassword.length < 4) return { success: false, message: '新しいパスワードは4文字以上で入力してください' };
+  if (nextPassword === adminPassword) return { success: false, message: '現在と同じパスワードです' };
+
+  setAdminPassword_(nextPassword);
+  return { success: true, message: '管理者パスワードを変更しました' };
 }
 
 function registerStaff(req, sessionToken) {
