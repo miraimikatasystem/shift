@@ -56,7 +56,7 @@ function doPost(e) {
       status: 401,
       ok: false,
       code: verifyResult.code || 'unauthorized',
-      message: 'authentication failed'
+      message: _authFailureMessage_(verifyResult.code)
     });
   }
 
@@ -65,7 +65,7 @@ function doPost(e) {
       status: 403,
       ok: false,
       code: 'forbidden',
-      message: 'permission denied'
+      message: 'このGoogleアカウントはアクセス許可メールに登録されていません'
     });
   }
 
@@ -110,6 +110,31 @@ function _parseJsonRequest_(e) {
     return { ok: true, data: parsed };
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : 'parse_error' };
+  }
+}
+
+function _authFailureMessage_(code) {
+  switch (String(code || '')) {
+    case 'server_misconfigured':
+      return 'GAS の GOOGLE_OAUTH_CLIENT_ID が未設定です';
+    case 'tokeninfo_unreachable':
+      return 'Google の認証確認サーバーに接続できませんでした';
+    case 'token_invalid':
+      return 'Google ID トークンが無効です';
+    case 'token_parse_failed':
+      return 'Google 認証レスポンスの解析に失敗しました';
+    case 'aud_mismatch':
+      return 'NEXT_PUBLIC_GOOGLE_CLIENT_ID と GAS の GOOGLE_OAUTH_CLIENT_ID が一致していません';
+    case 'iss_invalid':
+      return 'Google の発行元情報を確認できませんでした';
+    case 'token_expired':
+      return 'Google ログインのトークン期限が切れています。再ログインしてください';
+    case 'email_not_verified':
+      return 'Google アカウントのメール確認が完了していません';
+    case 'email_missing':
+      return 'Google アカウントのメールアドレスを取得できませんでした';
+    default:
+      return '認証に失敗しました';
   }
 }
 
