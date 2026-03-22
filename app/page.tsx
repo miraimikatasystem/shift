@@ -138,7 +138,6 @@ export default function Page() {
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== iframeRef.current?.contentWindow) return;
       if (event.data?.type === "gas-switch-admin" && event.data?.sessionToken) {
         submittedSessionRef.current = "";
         setIframeView("admin");
