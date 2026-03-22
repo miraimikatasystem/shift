@@ -274,6 +274,12 @@
     let currentRecruitId = null;
 
     function notifySessionExpired(message) {
+      try {
+        if (window.top && window.top !== window) {
+          window.top.postMessage({ type: 'gas-session-expired', message: message || '' }, '*');
+          return;
+        }
+      } catch (e) {}
       try { window.parent && window.parent.postMessage({ type: 'gas-session-expired', message: message || '' }, '*'); } catch (e) {}
     }
 
@@ -375,6 +381,13 @@
           return;
         }
         if (res.adminSessionToken) {
+          try {
+            if (window.top && window.top !== window) {
+              window.top.postMessage({ type: 'gas-switch-admin', sessionToken: res.adminSessionToken }, '*');
+              closeModal();
+              return;
+            }
+          } catch (e) {}
           try {
             if (window.parent && window.parent !== window) {
               window.parent.postMessage({ type: 'gas-switch-admin', sessionToken: res.adminSessionToken }, '*');
