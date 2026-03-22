@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>スタッフ | CAFE SHIFT</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Line+Seed+JP:wght@100;400;700;900&display=swap">
+  <style>
+    :root { 
+      --main: #1a73e8; 
+      --light: #f0f8ff; 
+      --border: #e2e8f0; 
+      --text: #333; 
+      --red: #d93025; 
+      --green: #34a853; 
+      --orange: #f59e0b; 
+      --gray: #888; 
+    }
+    body { 
+      font-family: 'LINE Seed JP', sans-serif; 
+      background: #f8f9fa; 
+      margin: 0; 
+      color: var(--text); 
+      padding-bottom: 90px; 
+    }
+    .page, .sub-view { display: none; animation: slideUp 0.3s; } 
+    .page.active, .sub-view.active { display: block; } 
+    .page { padding: 15px; }
+    
+    @keyframes slideUp { 
+      from { opacity: 0; transform: translateY(10px); } 
+      to { opacity: 1; transform: translateY(0); } 
+    }
+    
+    .section-title { 
+      font-weight: 900; 
+      font-size: 16px; 
+      color: #555; 
+      background-color: #e2e8f0; 
+      display: inline-block; 
+      padding: 8px 20px; 
+      border-radius: 12px 12px 0 0; 
+      margin: 20px 0 0 5px; 
+    }
+    .section-body { 
+      border-top: 2px solid #cbd5e1; 
+      padding-top: 20px; 
+      margin-bottom: 20px; 
+    }
+    .card { 
+      background: white; 
+      border-radius: 12px; 
+      padding: 15px; 
+      margin-bottom: 15px; 
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+      border: 1px solid #f0f0f0; 
+    }
+    input, textarea, select { 
+      width: 100%; 
+      padding: 12px; 
+      margin: 8px 0; 
+      border: 1px solid #ddd; 
+      border-radius: 10px; 
+      font-size: 14px; 
+      font-weight: 800; 
+      background: #fafafa; 
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    
+    .btn-main { 
+      width: 100%; 
+      padding: 14px; 
+      border-radius: 12px; 
+      font-weight: 900; 
+      border: none; 
+      background: var(--main); 
+      color: white; 
+      margin-bottom: 10px; 
+      cursor: pointer; 
+    }
+    .btn-cancel { 
+      width: 100%; 
+      padding: 14px; 
+      border-radius: 12px; 
+      font-weight: 900; 
+      border: 1px solid #ccc; 
+      background: white; 
+      color: #666; 
+      cursor: pointer; 
+    }
+    
+    .sub-tabs-container { 
+      display: flex; 
+      background: #e2e8f0; 
+      padding: 4px; 
+      border-radius: 12px; 
+      margin-bottom: 15px; 
+    }
+    .sub-tab { 
+      flex: 1; 
+      text-align: center; 
+      font-size: 13px; 
+      font-weight: 900; 
+      padding: 10px; 
+      cursor: pointer; 
+      border-radius: 10px; 
+      color: #666; 
+      border: none; 
+      background: transparent; 
+    }
+    .sub-tab.active { 
+      background: white; 
+      color: var(--main); 
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .table-wrapper { overflow-x: auto; max-height: 55vh; border-radius: 10px; border: 1px solid #e2e8f0; background: white; margin-bottom:15px; }
+    .matrix-table { border-collapse: collapse; width: max-content; min-width: 100%; }
+    .matrix-table th, .matrix-table td { border: 1px solid #e2e8f0; text-align: center; font-size: 11px; font-weight: 800; padding: 8px 5px; white-space: nowrap; }
+    .matrix-table thead th, .matrix-table tbody th { background: #f1f5f9; color: #555; position: sticky; z-index: 10; }
+    .matrix-table thead th { top: 0; z-index: 20; } 
+    .matrix-table tbody th { left: 0; }
+    
+    .cell { background: #fff; cursor: pointer; transition: 0.2s; }
+    .cell.selected { background: var(--main); color: white; }
+    
+    .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.95); display: none; height: 75px; border-top: 1px solid #eee; z-index: 2000; }
+    .nav-btn { flex: 1; border: none; background: none; color: #888; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; opacity: 0.35; }
+    .nav-btn.active { color: var(--main); opacity: 1; transform: translateY(-5px); background: var(--light); border-radius: 16px; }
+    .nav-btn span { font-size: 11px; margin-top: 6px; font-weight: 900; }
+    
+    .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5000; align-items: center; justify-content: center; }
+    .modal { background: white; width: 85%; max-width: 360px; border-radius: 24px; padding: 25px; box-shadow: 0 15px 40px rgba(0,0,0,0.3); }
+    
+    #toast { visibility: hidden; background: #333; color: white; padding: 12px 24px; border-radius: 30px; position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); z-index: 9999; font-size:13px; font-weight:bold;}
+    #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+    @keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 85px; opacity: 1; } } 
+    @keyframes fadeout { from { bottom: 85px; opacity: 1; } to { bottom: 0; opacity: 0; } }
+  </style>
+</head>
+<body>
+
+  <div id="pg-login" class="page active">
+    <div style="margin-top:10vh; text-align:center;">
+      <div style="font-size:24px; font-weight:900; color:var(--main); margin-bottom:20px;">☕ CAFE SHIFT</div>
+      <div class="card" style="text-align:left;">
+        <div style="font-size:12px; font-weight:800; color:#888;">お名前</div>
+        <input type="text" id="login-name">
+        <div style="font-size:12px; font-weight:800; color:#888;">PINコード</div>
+        <input type="password" id="login-pin" inputmode="numeric">
+        <button class="btn-main" style="margin-top:20px;" onclick="runLogin()">ログインする</button>
+        <button class="btn-cancel" style="border-color:var(--main); color:var(--main);" onclick="openAdminLogin()">管理者ログイン</button>
+        <button class="btn-cancel" style="border:none; color:var(--main); background:transparent;" onclick="showPage('pg-register')">新規登録はこちら</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pg-register" class="page">
+    <div class="section-title">【 👤 スタッフ登録 】</div>
+    <div class="section-body">
+      <div class="card">
+        <div style="font-size:12px; font-weight:800; color:#888;">名前</div>
+        <input type="text" id="reg-name">
+        <div style="font-size:12px; font-weight:800; color:#888;">PINコード (3桁〜4桁)</div>
+        <input type="password" id="reg-pin" inputmode="numeric">
+        <div style="font-size:12px; font-weight:800; color:#888;">電話番号</div>
+        <input type="tel" id="reg-phone">
+        <div style="font-size:12px; font-weight:800; color:#888;">メールアドレス</div>
+        <input type="email" id="reg-email">
+        <div style="font-size:12px; font-weight:800; color:#888;">コメント (シフトの希望・条件など)</div>
+        <textarea id="reg-note" rows="2"></textarea>
+        <div style="font-size:12px; font-weight:800; color:#888;">目安時間 (月あたり)</div>
+        <input type="number" id="reg-target-hours" min="1" step="0.5" placeholder="例: 80">
+        <button class="btn-main" style="margin-top:20px;" onclick="confirmRegister()">登録を申請する</button>
+        <button class="btn-cancel" onclick="showPage('pg-login')">ログインに戻る</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pg-home" class="page">
+    <div class="section-title">【 🏠 ホーム 】</div>
+    <div class="section-body">
+      
+      <div class="card" id="recruit-alert" style="display:none; border-left: 4px solid var(--main);" onclick="switchTab(document.getElementById('btn-shift'), 'pg-shift')">
+        <div style="font-weight:900; font-size:16px;">📢 シフト募集が届いています</div>
+        <div style="font-size:12px; color:#888; margin-top:5px;">タップして提出画面へ</div>
+      </div>
+      
+      <div style="font-size:14px; font-weight:900; color:#555; margin-bottom:10px;">📋 お知らせ</div>
+      <div id="staff-notices"><div style="font-size:12px; color:#888; text-align:center;">読み込み中...</div></div>
+      
+      <div style="font-size:14px; font-weight:900; color:#555; margin-top:20px; margin-bottom:10px;">📅 今日から1週間の予定</div>
+      <div id="staff-weekly-shifts"><div style="font-size:12px; color:#888; text-align:center;">読み込み中...</div></div>
+      
+    </div>
+  </div>
+
+  <div id="pg-shift" class="page">
+    <div class="section-title">【 📅 シフト 】</div>
+    <div class="section-body">
+      
+      <div class="sub-tabs-container">
+        <button class="sub-tab active" onclick="switchSubTab(this, 'shift-req')">⏳ 募集中</button>
+        <button class="sub-tab" onclick="switchSubTab(this, 'shift-sub')">📥 提出内容</button>
+        <button class="sub-tab" onclick="switchSubTab(this, 'shift-conf')">✅ 確定版</button>
+      </div>
+
+      <div id="confirmed-hours-card" class="card" style="padding:12px; margin-bottom:12px; border-left:4px solid var(--main);">
+        <div style="font-size:11px; font-weight:800; color:#888;">この期間の確定勤務時間</div>
+        <div id="confirmed-hours-value" style="font-size:22px; font-weight:900; color:var(--main); margin-top:4px;">0時間</div>
+      </div>
+      
+      <select class="recruit-selector" onchange="onSelectRecruit(this)" style="margin-bottom:15px; border-color:var(--main); color:var(--main); font-weight:900;"></select>
+      
+      <div id="shift-req" class="sub-view active">
+        <div class="card">
+          <div id="staff-req-content"><div style="font-size:12px; color:#888; text-align:center;">読み込み中...</div></div>
+        </div>
+      </div>
+
+      <div id="shift-sub" class="sub-view">
+        <div class="card">
+          <div id="staff-sub-content"><div style="font-size:12px; color:#888; text-align:center;">読み込み中...</div></div>
+        </div>
+      </div>
+
+      <div id="shift-conf" class="sub-view">
+        <div class="card">
+          <div id="staff-conf-content"><div style="font-size:12px; color:#888; text-align:center;">読み込み中...</div></div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <div id="pg-settings" class="page">
+    <div class="section-title">【 ⚙️ 設定 】</div>
+    <div class="section-body">
+      <div class="card">
+        <div style="font-size:12px; font-weight:800; color:#888;">名前</div>
+        <input type="text" id="set-name">
+        <div style="font-size:12px; font-weight:800; color:#888;">PINコード</div>
+        <input type="text" id="set-pin">
+        <div style="font-size:12px; font-weight:800; color:#888;">電話番号</div>
+        <input type="tel" id="set-phone">
+        <div style="font-size:12px; font-weight:800; color:#888;">メールアドレス</div>
+        <input type="email" id="set-email">
+        <div style="font-size:12px; font-weight:800; color:#888;">コメント</div>
+        <textarea id="set-note" rows="2"></textarea>
+        <div style="font-size:12px; font-weight:800; color:#888;">目安時間 (月あたり)</div>
+        <input type="number" id="set-target-hours" min="1" step="0.5" placeholder="例: 80">
+        <button class="btn-main" style="margin-top:20px;" onclick="showConfirm('更新確認', '情報を更新しますか？', '保存する', 'executeProfileUpdate()')">更新する</button>
+      </div>
+      <button class="btn-cancel" style="color:var(--red); border-color:var(--red);" onclick="showConfirm('ログアウト', 'ログアウトしますか？', 'ログアウト', 'toLogin()')">ログアウト</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="overlay" class="overlay"><div id="modal-box" class="modal"></div></div> 
+  
+  <nav class="nav" id="nav-bar">
+    <button id="btn-home" class="nav-btn active" onclick="switchTab(this, 'pg-home')">🏠<br><span>ホーム</span></button>
+    <button id="btn-shift" class="nav-btn" onclick="switchTab(this, 'pg-shift')">📅<br><span>シフト</span></button>
+    <button id="btn-settings" class="nav-btn" onclick="switchTab(this, 'pg-settings')">⚙️<br><span>設定</span></button>
+  </nav>
+
+  <script>
+    const SESSION_TOKEN = <?!= JSON.stringify(sessionToken) ?>;
+    const SESSION_EMAIL = <?!= JSON.stringify(sessionEmail) ?>;
+    const SESSION_ROLE = <?!= JSON.stringify(sessionRole) ?>;
+    let myName = "";
+    let currentRecruitId = null;
+
+    function notifySessionExpired(message) {
+      try { window.parent && window.parent.postMessage({ type: 'gas-session-expired', message: message || '' }, '*'); } catch (e) {}
+    }
+
+    function handleServerFailure(err, title = 'エラー') {
+      const message = err && err.message ? err.message : 'システムエラーが発生しました';
+      if (message.indexOf('セッション') !== -1) notifySessionExpired(message);
+      openAlertModal(title, message);
+    }
+
+    function staffRunner(title = 'エラー') {
+      return google.script.run.withFailureHandler(function(err) { handleServerFailure(err, title); });
+    }
+
+    // --- 🌟 確実なタブ切り替えロジック ---
+    function showPage(id) { 
+      document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); }); 
+      document.getElementById(id).classList.add('active'); 
+    }
+    
+    function switchTab(btn, pageId) { 
+      showPage(pageId); 
+      document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); }); 
+      btn.classList.add('active'); 
+    }
+    
+    function switchSubTab(btn, viewId) { 
+      const container = btn.closest('.section-body'); 
+      if (!container) return;
+      container.querySelectorAll('.sub-tab').forEach(function(t) { t.classList.remove('active'); }); 
+      btn.classList.add('active'); 
+      container.querySelectorAll('.sub-view').forEach(function(v) { v.classList.remove('active'); }); 
+      document.getElementById(viewId).classList.add('active'); 
+    }
+
+    function doToast(msg) { 
+      const t = document.getElementById("toast"); 
+      t.innerText = msg; 
+      t.className = "show"; 
+      setTimeout(function() { t.className = ""; }, 3000); 
+    }
+    
+    function showModal(html) { 
+      document.getElementById("modal-box").innerHTML = html; 
+      document.getElementById("overlay").style.display = "flex"; 
+    }
+    
+    function closeModal() { 
+      document.getElementById("overlay").style.display = "none"; 
+    }
+
+    // ✅ 確認モーダル用：実行したい処理を一時保存
+    let pendingActionCode = null; 
+
+    function executePendingAction() {
+      closeModal();
+      if (pendingActionCode) {
+        try {
+          (new Function(pendingActionCode))();
+        } catch (e) {
+          console.error("Action Error:", e);
+        }
+        pendingActionCode = null;
+      }
+    }
+
+    function openConfirmModal(title, msg, btnText, actionCode) { 
+      pendingActionCode = actionCode;
+      showModal(`
+        <div style="font-weight:900; color:var(--main); margin-bottom:15px; font-size:18px;">${title}</div>
+        <div style="font-size:14px; font-weight:800; color:#555; margin-bottom:20px; text-align:left; background:#f9f9f9; padding:15px; border-radius:10px;">${msg}</div>
+        <button class="btn-main" onclick="executePendingAction()">${btnText}</button>
+        <button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>
+      `); 
+    }
+    
+    function openAlertModal(title, msg) { 
+      showModal(`
+        <div style="font-weight:900; color:var(--red); margin-bottom:15px; font-size:18px;">${title}</div>
+        <div style="font-size:14px; font-weight:800; color:#555; margin-bottom:20px; text-align:left; background:#fce8e6; padding:15px; border-radius:10px;">${msg}</div>
+        <button class="btn-cancel" onclick="closeModal()">閉じる</button>
+      `); 
+    }
+
+    function openAdminLogin() {
+      showModal(`
+        <div style="font-weight:900; color:var(--main); margin-bottom:15px; font-size:18px;">管理者ログイン</div>
+        <div style="font-size:12px; font-weight:800; color:#888;">管理者パスワード</div>
+        <input type="password" id="admin-password" style="margin-bottom:20px;">
+        <button class="btn-main" onclick="runAdminLogin()">管理者画面へ</button>
+        <button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>
+      `);
+    }
+
+    function runAdminLogin() {
+      const password = document.getElementById('admin-password').value;
+      staffRunner('エラー').withSuccessHandler(function(res) {
+        if (!res || !res.success) {
+          openAlertModal('エラー', (res && res.message) ? res.message : 'ログインできませんでした');
+          return;
+        }
+        window.location.href = res.redirectUrl;
+      }).authenticateAdmin(password, SESSION_TOKEN);
+    }
+
+    // --- ログイン・登録 ---
+    function confirmRegister() { 
+      const d = { n: document.getElementById('reg-name').value }; 
+      openConfirmModal('登録確認', `名前: ${d.n}<br>この内容で申請しますか？`, '申請する', 'submitRegister()'); 
+    }
+    
+    function submitRegister() { 
+      doToast('申請中...'); 
+      const data = { 
+        name: document.getElementById('reg-name').value, 
+        pin: document.getElementById('reg-pin').value, 
+        phone: document.getElementById('reg-phone').value, 
+        email: document.getElementById('reg-email').value, 
+        note: document.getElementById('reg-note').value,
+        targetHours: document.getElementById('reg-target-hours').value
+      }; 
+      staffRunner('申請エラー').withSuccessHandler(function(r) { 
+        doToast(r.message); 
+        if(r.success) showPage('pg-login'); 
+      }).registerStaff(data, SESSION_TOKEN); 
+    }
+
+    function runLogin() {
+      doToast('ログイン中...'); 
+      const name = document.getElementById('login-name').value; 
+      const pin = document.getElementById('login-pin').value;
+      staffRunner('エラー').withSuccessHandler(function(res) {
+        if(res.success) {
+          myName = res.staffData.name; 
+          document.getElementById('set-name').value = res.staffData.name; 
+          document.getElementById('set-pin').value = res.staffData.pin; 
+          document.getElementById('set-phone').value = res.staffData.phone; 
+          document.getElementById('set-email').value = res.staffData.email; 
+          document.getElementById('set-note').value = res.staffData.note;
+          document.getElementById('set-target-hours').value = res.staffData.targetHours || '';
+          
+          document.getElementById('nav-bar').style.display = 'flex'; 
+          switchTab(document.getElementById('btn-home'), 'pg-home'); 
+          loadInitData(null);
+        } else {
+          openAlertModal('エラー', res.message); 
+        }
+      }).verifyStaffPin(name, pin, SESSION_TOKEN);
+    }
+
+    function onSelectRecruit(selElem) { 
+      currentRecruitId = selElem.value; 
+      document.querySelectorAll('.recruit-selector').forEach(function(sel) { sel.value = currentRecruitId; });
+      
+      document.getElementById('staff-req-content').innerHTML = '<div style="font-size:12px; color:#888; text-align:center;">読み込み中...</div>';
+      document.getElementById('staff-sub-content').innerHTML = '<div style="font-size:12px; color:#888; text-align:center;">読み込み中...</div>';
+      document.getElementById('staff-conf-content').innerHTML = '<div style="font-size:12px; color:#888; text-align:center;">読み込み中...</div>';
+      loadInitData(currentRecruitId); 
+    }
+
+    // --- データ読み込みと描画 ---
+    function loadInitData(targetRecruitId) {
+      staffRunner('エラー').withSuccessHandler(function(data) {
+        
+        let optionsHtml = data.recruitList.map(function(r) { 
+          return `<option value="${r.id}" ${currentRecruitId===r.id?'selected':''}>${r.label}</option>`; 
+        }).join('');
+        if(!optionsHtml) optionsHtml = '<option value="">募集履歴なし</option>';
+        document.querySelectorAll('.recruit-selector').forEach(function(sel) { sel.innerHTML = optionsHtml; });
+        if (!currentRecruitId && data.recruitList.length > 0) currentRecruitId = data.recruitList[0].id;
+
+        document.getElementById('confirmed-hours-value').innerText = `${Number(data.confirmedHours || 0)}時間`;
+
+        // お知らせ
+        let nHtml = '';
+        if(data.notices && data.notices.length > 0) {
+           data.notices.forEach(function(n) {
+             let d = new Date(n.date); 
+             let dStr = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+             nHtml += `
+               <div class="card" style="padding:10px;">
+                 <div style="font-size:10px; color:#888;">${dStr}</div>
+                 <div style="font-weight:900; font-size:13px; margin:5px 0;">${n.title}</div>
+                 <div style="font-size:11px; color:#555; line-height:1.4;">${(n.msg||'').replace(/\n/g, '<br>')}</div>
+               </div>`;
+           });
+        } else {
+          nHtml = `<div style="font-size:12px; color:#888; text-align:center;">お知らせはありません</div>`;
+        }
+        document.getElementById('staff-notices').innerHTML = nHtml;
+
+        // 1週間の予定
+        let wHtml = '';
+        if(data.weeklyShifts && data.weeklyShifts.length > 0) {
+           let today = new Date(); today.setHours(0,0,0,0); 
+           let nextWeek = new Date(today); nextWeek.setDate(nextWeek.getDate() + 7);
+           let filtered = [];
+           data.weeklyShifts.forEach(function(s) {
+              let m = s.date.match(/(\d+)\/(\d+)/);
+              if(m) { 
+                let sDate = new Date(); 
+                sDate.setMonth(parseInt(m[1])-1, parseInt(m[2])); 
+                if(today.getMonth() > 9 && parseInt(m[1]) < 3) sDate.setFullYear(sDate.getFullYear() + 1); 
+                sDate.setHours(0,0,0,0); 
+                if(sDate >= today && sDate <= nextWeek) filtered.push({...s, parsedDate: sDate});
+              }
+           });
+           
+           if(filtered.length > 0) {
+             filtered.sort(function(a,b) { return a.parsedDate - b.parsedDate; }); 
+             let grouped = {}; 
+             filtered.forEach(function(s) { 
+               if(!grouped[s.date]) grouped[s.date] = []; 
+               grouped[s.date].push(parseInt(s.time.split(':')[0])); 
+             });
+             
+             for(let d in grouped) {
+               let times = grouped[d].sort(function(a,b) { return a-b; }); 
+               let timeStrs = []; 
+               let start = times[0], prev = times[0];
+               for (let i = 1; i <= times.length; i++) { 
+                 if (times[i] === prev + 1) prev = times[i];
+                 else { 
+                   timeStrs.push(`${start}:00〜${prev + 1}:00`); 
+                   if (i < times.length) { start = times[i]; prev = times[i]; }
+                 } 
+               }
+               wHtml += `
+                 <div class="card" style="display:flex; justify-content:space-between; padding:12px; margin-bottom:8px;">
+                   <div style="font-weight:900; color:var(--main);">${d}</div>
+                   <div style="font-weight:800; font-size:12px;">${timeStrs.join(', ')}</div>
+                 </div>`;
+             }
+           } else {
+             wHtml = `<div style="font-size:12px; color:#888; text-align:center;">1週間以内のシフトはありません</div>`;
+           }
+        } else {
+          wHtml = `<div style="font-size:12px; color:#888; text-align:center;">1週間以内のシフトはありません</div>`;
+        }
+        document.getElementById('staff-weekly-shifts').innerHTML = wHtml;
+
+        const reqBox = document.getElementById('staff-req-content'); 
+        const subBox = document.getElementById('staff-sub-content'); 
+        const confBox = document.getElementById('staff-conf-content');
+        
+        if(!data.recruit) { 
+          reqBox.innerHTML = '<div style="text-align:center; color:#888; padding:20px;">対象のシフトはありません。</div>'; 
+          subBox.innerHTML = '<div style="text-align:center; color:#888; padding:20px;">対象のシフトはありません。</div>'; 
+          confBox.innerHTML = '<div style="text-align:center; color:#888; padding:20px;">対象のシフトはありません。</div>'; 
+          document.getElementById('recruit-alert').style.display = 'none'; 
+          return; 
+        }
+
+        // 状況判定
+        let isConfirmed = (data.recruitStatus === '確定済'); 
+        let isAdjusting = (data.recruitStatus === '調整中'); 
+        let isExpired = false;
+        if (data.recruit.deadline) { 
+          let dl = new Date(data.recruit.deadline.replace(/\//g, '-') + "T23:59:59"); 
+          if (dl < new Date()) isExpired = true; 
+        }
+        let canSubmit = (!isConfirmed && !isExpired && !isAdjusting);
+        document.getElementById('recruit-alert').style.display = canSubmit ? 'block' : 'none';
+
+        // テーブル作成
+        let htmlHead = `<div class="table-wrapper"><table class="matrix-table"><thead><tr><th></th>`; 
+        data.recruit.dates.forEach(function(d) { htmlHead += `<th>${d}</th>`; }); 
+        htmlHead += `</tr></thead><tbody>`;
+        
+        let reqHtml = `<div style="font-size:12px; font-weight:800; color:#888; margin-bottom:10px;">希望する枠をタップしてください。</div>` + htmlHead;
+        let subHtml = `<div style="font-size:12px; font-weight:800; color:#888; margin-bottom:10px;">あなたの提出希望です。</div>` + htmlHead;
+        let confHtml = `<div style="font-size:12px; font-weight:800; color:#888; margin-bottom:10px;">自分のシフトは赤文字です。<br>タップで変更申請が送れます。</div>` + htmlHead;
+
+        data.recruit.times.forEach(function(t) {
+          reqHtml += `<tr><th>${t}~</th>`; 
+          subHtml += `<tr><th>${t}~</th>`; 
+          confHtml += `<tr><th>${t}~</th>`;
+          let cellH = parseInt(t.split(':')[0], 10);
+          
+          data.recruit.dates.forEach(function(d) {
+            let isClosed = false; let isOut = false; 
+            let ex = data.recruit.exceptions.find(function(e) { return e.formattedDate === d; });
+            
+            if (ex) { 
+              if (ex.type === 'close') isClosed = true; 
+              else if (ex.type === 'short') { 
+                if (cellH < parseInt(ex.start.split(':')[0], 10) || cellH >= parseInt(ex.end.split(':')[0], 10)) isOut = true; 
+              } 
+            } else { 
+              if (cellH < parseInt(data.recruit.defStart.split(':')[0], 10) || cellH >= parseInt(data.recruit.defEnd.split(':')[0], 10)) isOut = true; 
+            }
+
+            if (isClosed || isOut) { 
+              reqHtml += `<td style="background:#f1f5f9; color:#aaa;">休業</td>`; 
+              subHtml += `<td style="background:#f1f5f9; color:#aaa;">休業</td>`; 
+              confHtml += `<td style="background:#f1f5f9; color:#aaa;">休業</td>`; 
+            } else {
+               let isSelected = data.shifts.some(function(s) { 
+                 return s.status === '希望' && s.name === myName && s.date == d && s.time == t; 
+               });
+               
+               reqHtml += `<td class="${isSelected ? 'cell selected' : 'cell'}" data-date="${d}" data-time="${t}" style="${isSelected ? 'background:var(--main); color:white;' : ''}" onclick="this.classList.toggle('selected'); this.style.background=this.classList.contains('selected')?'var(--main)':''; this.style.color=this.classList.contains('selected')?'white':'';"></td>`;
+               subHtml += `<td style="${isSelected ? 'background:var(--main); color:white;' : ''}"></td>`;
+
+               let cellContent = ""; 
+               let hasVacancy = false; 
+               let isVolunteering = data.shifts.some(function(s) { 
+                 return s.status === '立候補' && s.name === myName && s.date == d && s.time == t; 
+               });
+               
+               data.shifts.forEach(function(s) {
+                 // ✅ 変更申請中でも枠から名前が消えないように「確定 OR 変更申請」を表示対象にする
+                 if (s.date == d && s.time == t && (s.status === '確定' || s.status === '変更申請')) {
+                   if (s.name === '欠員') {
+                     hasVacancy = true;
+                   } else if (s.name === myName) {
+                     if (s.status === '変更申請') {
+                       cellContent += `<div style="background:#ffebee; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:2px; font-weight:900; margin-bottom:4px; font-size:10px; text-align:center;">申請中</div>`;
+                     } else {
+                       cellContent += `<div style="background:#ffebee; color:var(--red); border:1px solid var(--red); border-radius:4px; padding:2px; font-weight:900; margin-bottom:4px; cursor:pointer;" onclick="openChangeModal('${d} ${t}')">${s.name}</div>`;
+                     }
+                   } else {
+                     cellContent += `<div style="background:var(--light); color:var(--main); border-radius:4px; padding:2px; font-weight:900; margin-bottom:4px;">${s.name}</div>`;
+                   }
+                 }
+               });
+               
+               if (hasVacancy && !isVolunteering) {
+                 confHtml += `<td>${cellContent}<button style="background:var(--orange); color:white; border:none; border-radius:4px; padding:4px; font-size:10px; font-weight:900; width:100%; cursor:pointer;" onclick="openConfirmModal('立候補', 'この欠員枠に立候補しますか？', '立候補する', 'applyVacancy(\\'${d} ${t}\\')')">🙋 欠員</button></td>`;
+               } else if (isVolunteering) {
+                 confHtml += `<td>${cellContent}<div style="background:#fff3e0; color:var(--orange); border:1px solid var(--orange); border-radius:4px; padding:2px; font-weight:900; margin-bottom:4px; font-size:10px; text-align:center;">🙋 立候補中</div></td>`;
+               } else {
+                 confHtml += `<td>${cellContent}</td>`;
+               }
+            }
+          });
+          reqHtml += `</tr>`; subHtml += `</tr>`; confHtml += `</tr>`;
+        });
+        
+        let htmlFoot = `</tbody></table></div>`;
+        
+        if (canSubmit) {
+          const commentText = String(data.submitComment || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          reqBox.innerHTML = reqHtml + htmlFoot + `<div style="font-size:12px; font-weight:800; color:#888; margin-bottom:4px;">コメント</div><textarea id="shift-comment" rows="3" placeholder="店長への共有事項があれば記入してください">${commentText}</textarea><button class="btn-main" style="margin-top:15px;" onclick="openConfirmModal('提出確認', '店長に送信しますか？', '送信', 'executeSubmit()')">希望を送信する</button>`;
+        } else {
+          let reasonMsg = isAdjusting ? "現在、店長がシフトを調整中です。" : "この募集は締め切られました。";
+          reqBox.innerHTML = `<div style="text-align:center; padding:20px; color:var(--red); font-weight:900;">${reasonMsg}<br><br><span style="font-size:12px; color:#888;">提出内容は「📥 提出内容」タブから確認できます。</span></div>`;
+        }
+        
+        subBox.innerHTML = subHtml + htmlFoot;
+
+        if (isConfirmed) {
+          // 公開済み：全員の一覧（個人別）
+          let pHead = `<div class="table-wrapper"><table class="matrix-table"><thead><tr><th style="min-width:70px;">スタッフ</th>`; 
+          data.recruit.dates.forEach(function(d) { pHead += `<th>${d}</th>`; }); 
+          pHead += `</tr></thead><tbody>`;
+          
+          let pHtml = pHead;
+          data.activeStaffs.forEach(function(staff) {
+            pHtml += `<tr><th style="background:#fff; font-size:14px; color:var(--main);">${staff}</th>`;
+            data.recruit.dates.forEach(function(d) {
+              let myShifts = data.shifts.filter(function(s) { return s.status === '確定' && s.name === staff && s.date === d; });
+              if (myShifts.length === 0) {
+                pHtml += `<td style="color:#ccc; font-weight:normal;">✕</td>`;
+              } else {
+                let times = myShifts.map(function(s) { return parseInt(s.time.split(':')[0], 10); }).sort(function(a,b) { return a-b; }); 
+                let timeStrs = []; let start = times[0], prev = times[0];
+                for (let i = 1; i <= times.length; i++) { 
+                  if (times[i] === prev + 1) prev = times[i];
+                  else { 
+                    timeStrs.push(`${start}:00〜${prev + 1}:00`); 
+                    if (i < times.length) { start = times[i]; prev = times[i]; }
+                  } 
+                }
+                pHtml += `<td style="font-size:10px; font-weight:900; color:#555; line-height:1.6;">${timeStrs.join('<br>')}</td>`;
+              }
+            });
+            pHtml += `</tr>`;
+          });
+
+          confBox.innerHTML = confHtml + htmlFoot + `<div style="font-size:12px; font-weight:900; color:#888; margin:15px 0 10px 0;">👇 全員のシフト（個人別）</div>` + pHtml + `</tbody></table></div>`;
+        } else {
+          confBox.innerHTML = `<div style="text-align:center; padding:20px; color:#555; font-weight:900;">まだシフトは公開されていません。</div>`;
+        }
+      }).getStaffInitData(myName, targetRecruitId, SESSION_TOKEN);
+    }
+
+    // --- 各種アクション ---
+    function executeSubmit() { 
+      const slots = []; 
+      document.querySelectorAll('#shift-req .cell.selected').forEach(function(c) { 
+        slots.push({date: c.dataset.date, time: c.dataset.time}); 
+      }); 
+      const comment = document.getElementById('shift-comment') ? document.getElementById('shift-comment').value : '';
+      staffRunner('送信エラー').withSuccessHandler(function(r) { 
+        doToast(r.message); 
+        loadInitData(currentRecruitId); 
+      }).submitShiftData(currentRecruitId, myName, slots, comment, SESSION_TOKEN); 
+    }
+    
+    function applyVacancy(dt) { 
+      staffRunner('送信エラー').withSuccessHandler(function(r) { 
+        doToast(r.message); 
+        loadInitData(currentRecruitId); 
+      }).applyForVacancy(currentRecruitId, dt, myName, SESSION_TOKEN); 
+    }
+    
+    function openChangeModal(dt) { 
+      showModal(`
+        <div style="font-weight:900; color:var(--red); margin-bottom:15px; font-size:18px;">⚠️ 休み申請</div>
+        <div style="font-size:13px; font-weight:800; color:#555; margin-bottom:10px;">対象: ${dt}</div>
+        <div style="font-size:11px; font-weight:800; color:#888; text-align:left;">理由をご記入ください（必須）</div>
+        <input type="text" id="change-reason" placeholder="例: テスト期間のため" style="margin-bottom:20px;">
+        <button class="btn-main" style="background:var(--red); color:white;" onclick="executeChangeRequest('${dt}')">店長に送信する</button>
+        <button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>
+      `); 
+    }
+    
+    function executeChangeRequest(dt) { 
+      const reason = document.getElementById('change-reason').value; 
+      if(!reason) return alert('理由を入力してください'); 
+      doToast('送信中...'); 
+      closeModal(); 
+      staffRunner('送信エラー').withSuccessHandler(function(r) { 
+        doToast(r.message); 
+        loadInitData(currentRecruitId); 
+      }).sendChangeRequest(currentRecruitId, dt, myName, reason, SESSION_TOKEN); 
+    }
+    
+    function executeProfileUpdate() { 
+      doToast('更新中...'); 
+      const req = { 
+        name: document.getElementById('set-name').value, 
+        pin: document.getElementById('set-pin').value, 
+        phone: document.getElementById('set-phone').value, 
+        email: document.getElementById('set-email').value, 
+        note: document.getElementById('set-note').value,
+        targetHours: document.getElementById('set-target-hours').value
+      }; 
+      staffRunner('更新エラー').withSuccessHandler(function(r) { 
+        doToast(r.message); 
+        if(r.success) { myName = r.newName; } 
+      }).updateStaffProfile(myName, req, SESSION_TOKEN); 
+    }
+    
+    function showConfirm(title, msg, btnText, actionCode) { 
+      openConfirmModal(title, msg, btnText, actionCode); 
+    }
+    
+    function toLogin() { 
+      document.getElementById('nav-bar').style.display = 'none'; 
+      showPage('pg-login'); 
+    }
+  </script>
+</body>
+</html>
