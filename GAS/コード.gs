@@ -189,15 +189,20 @@ function _jsonResponse_(body) {
 
 function _createSession_(email, role) {
   const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
-  const cacheKey = 'sess:' + token;
   const session = {
     email: String(email || '').toLowerCase(),
     role: String(role || 'staff'),
     issuedAt: Date.now(),
     expiresAt: Date.now() + (SESSION_TTL_SEC * 1000)
   };
-  CacheService.getScriptCache().put(cacheKey, JSON.stringify(session), SESSION_TTL_SEC);
+  _saveSession_(token, session);
   return { token: token, expiresIn: SESSION_TTL_SEC };
+}
+
+function _saveSession_(token, session) {
+  if (!token || !session) return;
+  const cacheKey = 'sess:' + String(token);
+  CacheService.getScriptCache().put(cacheKey, JSON.stringify(session), SESSION_TTL_SEC);
 }
 
 function _getSession_(token, touch) {
@@ -214,7 +219,7 @@ function _getSession_(token, touch) {
     }
     if (touch) {
       session.expiresAt = Date.now() + (SESSION_TTL_SEC * 1000);
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(session), SESSION_TTL_SEC);
+      _saveSession_(token, session);
     }
     return session;
   } catch (err) {
@@ -577,16 +582,18 @@ function verifyStaffPin(name, pin, sessionToken) {
 }
 
 function authenticateAdmin(password, sessionToken) {
-  _requireSession_(sessionToken);
+  const session = _requireSession_(sessionToken);
   if (!ADMIN_PASSWORD) return { success: false, message: '管理者パスワードが未設定です。Script Properties に ADMIN_PASSWORD を設定してください。' };
   if (String(password || '') !== ADMIN_PASSWORD) return { success: false, message: 'パスワードが違います' };
 
-  const session = _createSession_('admin', 'admin');
+  session.role = 'admin';
+  session.expiresAt = Date.now() + (SESSION_TTL_SEC * 1000);
+  _saveSession_(sessionToken, session);
   const baseUrl = ScriptApp.getService().getUrl();
   return {
     success: true,
-    adminSessionToken: session.token,
-    redirectUrl: baseUrl ? (baseUrl + '?view=admin&st=' + encodeURIComponent(session.token)) : ''
+    adminSessionToken: sessionToken,
+    redirectUrl: baseUrl ? (baseUrl + '?view=admin&st=' + encodeURIComponent(sessionToken)) : ''
   };
 }
 

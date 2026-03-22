@@ -162,11 +162,12 @@ export default function Page() {
 
   useEffect(() => {
     if (authState !== "signed_in" || !sessionToken || !gasUrl || !bootstrapFormRef.current) return;
-    if (submittedSessionRef.current === sessionToken) return;
+    const nextSubmitKey = `${iframeView}:${sessionToken}`;
+    if (submittedSessionRef.current === nextSubmitKey) return;
 
-    submittedSessionRef.current = sessionToken;
+    submittedSessionRef.current = nextSubmitKey;
     bootstrapFormRef.current.submit();
-  }, [authState, sessionToken]);
+  }, [authState, sessionToken, iframeView]);
 
   useEffect(() => {
     if (!googleClientId) {
