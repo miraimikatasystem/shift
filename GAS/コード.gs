@@ -271,7 +271,7 @@ function ensureAllowedEmailsSheet_() {
 
 function getAllowedEmailEntries_() {
   const sheet = ensureAllowedEmailsSheet_();
-  const data = sheet.getDataRange().getValues();
+  const data = sheet.getDataRange().getDisplayValues();
   const entries = [];
   for (let i = 1; i < data.length; i++) {
     const email = _normalizeEmail_(data[i][1]);
