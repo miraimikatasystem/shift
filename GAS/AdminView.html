@@ -190,7 +190,7 @@
         
         const alertBox = document.getElementById('admin-alerts');
         if(!data.alerts || data.alerts.length === 0) alertBox.innerHTML = '<div style="font-size:12px; color:#888; padding:10px;">お知らせはありません</div>'; 
-        else alertBox.innerHTML = data.alerts.map(a => `<div class="card" style="border-left:4px solid ${a.type==='変更申請'?'var(--red-text)':(a.type==='立候補'?'var(--orange-text)':'var(--main-blue)')}; padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:10px; font-weight:bold; color:#888;">${escapeHtmlText(a.type)}</div><div style="font-weight:bold; font-size:14px;">${escapeHtmlText(a.name)}</div><div style="font-size:11px; color:#555;">${escapeHtmlText(a.msg)}</div></div><button style="background:var(--light-blue); color:var(--main-blue); border:none; border-radius:6px; font-size:10px; font-weight:bold; padding:8px 12px;" onclick='openAlertTarget(${escapeJsArg(a.type)}, ${escapeJsArg(a.name)})'>確認</button></div>`).join('');
+        else alertBox.innerHTML = data.alerts.map(a => `<div class="card" style="border-left:4px solid ${a.type==='変更申請'?'var(--red-text)':(a.type==='立候補'?'var(--orange-text)':'var(--main-blue)')}; padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:10px; font-weight:bold; color:#888;">${escapeHtmlText(a.type)}</div><div style="font-weight:bold; font-size:14px;">${escapeHtmlText(a.name)}</div><div style="font-size:11px; color:#555;">${escapeHtmlText(a.msg)}</div></div><button style="background:var(--light-blue); color:var(--main-blue); border:none; border-radius:6px; font-size:10px; font-weight:bold; padding:8px 12px;" onclick='openAlertTarget(${escapeJsArg(a.type)}, ${escapeJsArg(a.name)}, ${escapeJsArg(a.staffRowNumber || "")})'>確認</button></div>`).join('');
 
         document.getElementById('home-today-date').innerText = data.todayDateStr || '';
         const todayBox = document.getElementById('admin-today-shift');
@@ -234,6 +234,7 @@
            let statusColor = s.status === '稼働中' ? 'var(--green)' : (s.status === '申請中' ? 'var(--orange)' : '#ccc');
            let statusTextColor = s.status === '稼働中' ? 'var(--green-text)' : (s.status === '申請中' ? '#fff' : '#666');
            const modalArgs = [
+             escapeJsArg(s.rowNumber || ''),
              escapeJsArg(s.name),
              escapeJsArg(s.phone),
              escapeJsArg(s.email),
@@ -253,16 +254,16 @@
       renderStaffList();
     }
 
-    function openPendingStaffByName(name) {
-      const staff = (adminData.staffs || []).find(s => s.name === name);
+    function openPendingStaffByName(name, rowNumber) {
+      const staff = (adminData.staffs || []).find(s => String(s.rowNumber || '') === String(rowNumber || '')) || (adminData.staffs || []).find(s => s.name === name && s.status === '申請中');
       switchTab(document.getElementById('btn-staff'), 'pg-staff');
       setStaffFilter('申請中');
-      if (staff) openStaffEditModal(staff.name, staff.phone, staff.email, staff.status, staff.role, staff.note || '');
+      if (staff) openStaffEditModal(staff.rowNumber, staff.name, staff.phone, staff.email, staff.status, staff.role, staff.note || '');
     }
 
-    function openAlertTarget(type, name) {
+    function openAlertTarget(type, name, staffRowNumber) {
       if (type === '新規登録') {
-        openPendingStaffByName(name);
+        openPendingStaffByName(name, staffRowNumber);
         return;
       }
       switchTab(document.getElementById('btn-shift'), 'pg-shift');
@@ -515,20 +516,21 @@
     function openConfirmModal(title, msg, btnText, actionCode) { showModal(`<div style="font-weight:bold; color:var(--main-blue); margin-bottom:15px; font-size:18px;">${title}</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:20px; text-align:left; background:#f9f9f9; padding:15px; border-radius:10px;">${msg}</div><button class="btn-main" onclick="${actionCode}; closeModal();">${btnText}</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>`); }
     function openAlertModal(title, msg) { showModal(`<div style="font-weight:bold; color:var(--red-text); margin-bottom:15px; font-size:18px;">${title}</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:20px; text-align:left; background:#fce8e6; padding:15px; border-radius:10px;">${msg}</div><button class="btn-cancel" onclick="closeModal()">閉じる</button>`); }
 
-    function openStaffEditModal(name, tel, mail, status, role, note) {
+    function openStaffEditModal(rowNumber, name, tel, mail, status, role, note) {
       const safeName = escapeHtmlText(name);
       const safeTel = escapeHtmlText(tel);
       const safeMail = escapeHtmlText(mail);
       const safeRole = escapeHtmlText(role);
       const safeNote = escapeHtmlText(note);
+      const rowArg = escapeJsArg(rowNumber || '');
       const nameArg = escapeJsArg(name);
-      showModal(`<div style="font-weight:bold; color:var(--main-blue); margin-bottom:10px; font-size:18px;">スタッフ情報</div><div style="font-weight:bold; font-size:20px; margin-bottom:15px;">${safeName}</div><div style="display:flex; gap:10px; margin-bottom:15px;"><a href="tel:${safeTel}" style="flex:1; background:#e6f4ea; color:#137333; text-decoration:none; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; display:inline-block;">📞 電話</a><a href="mailto:${safeMail}" style="flex:1; background:#f0f8ff; color:#1a73e8; text-decoration:none; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; display:inline-block;">✉️ メール</a></div><div style="text-align:left;"><div style="font-size:11px; font-weight:bold; color:#888;">ステータス</div><select id="es-status" style="margin-bottom:10px;"><option ${status==='稼働中'?'selected':''}>稼働中</option><option ${status==='申請中'?'selected':''}>申請中</option><option ${status==='休職'?'selected':''}>休職</option><option ${status==='退職'?'selected':''}>退職</option></select><div style="font-size:11px; font-weight:bold; color:#888;">管理者記入欄</div><input type="text" id="es-role" value="${safeRole}" style="margin-bottom:10px;"><div style="font-size:11px; font-weight:bold; color:#888;">コメント</div><textarea id="es-note" rows="2" style="margin-bottom:15px;">${safeNote}</textarea></div><button class="btn-main" onclick='executeStaffEdit(${nameArg})'>💾 保存する</button><button class="btn-cancel" style="color:var(--red-text); border-color:var(--red-text);" onclick='confirmStaffDelete(${nameArg})'>🗑️ 削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">閉じる</button>`);
+      showModal(`<div style="font-weight:bold; color:var(--main-blue); margin-bottom:10px; font-size:18px;">スタッフ情報</div><div style="font-weight:bold; font-size:20px; margin-bottom:15px;">${safeName}</div><div style="display:flex; gap:10px; margin-bottom:15px;"><a href="tel:${safeTel}" style="flex:1; background:#e6f4ea; color:#137333; text-decoration:none; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; display:inline-block;">📞 電話</a><a href="mailto:${safeMail}" style="flex:1; background:#f0f8ff; color:#1a73e8; text-decoration:none; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; display:inline-block;">✉️ メール</a></div><div style="text-align:left;"><div style="font-size:11px; font-weight:bold; color:#888;">ステータス</div><select id="es-status" style="margin-bottom:10px;"><option ${status==='稼働中'?'selected':''}>稼働中</option><option ${status==='申請中'?'selected':''}>申請中</option><option ${status==='休職'?'selected':''}>休職</option><option ${status==='退職'?'selected':''}>退職</option></select><div style="font-size:11px; font-weight:bold; color:#888;">管理者記入欄</div><input type="text" id="es-role" value="${safeRole}" style="margin-bottom:10px;"><div style="font-size:11px; font-weight:bold; color:#888;">コメント</div><textarea id="es-note" rows="2" style="margin-bottom:15px;">${safeNote}</textarea></div><button class="btn-main" onclick='executeStaffEdit(${rowArg})'>💾 保存する</button><button class="btn-cancel" style="color:var(--red-text); border-color:var(--red-text);" onclick='confirmStaffDelete(${rowArg}, ${nameArg})'>🗑️ 削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">閉じる</button>`);
     }
-    function executeStaffEdit(name) { doToast('更新中...'); closeModal(); adminRunner('更新エラー').withSuccessHandler(r=>{doToast(r.message);loadData(currentRecruitId);}).updateAdminStaffStatus(name, document.getElementById('es-status').value, document.getElementById('es-role').value, document.getElementById('es-note').value, SESSION_TOKEN); }
-    function confirmStaffDelete(name) {
-      showModal(`<div style="font-weight:bold; color:var(--red-text); margin-bottom:12px; font-size:18px;">スタッフを削除</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:12px;">${escapeHtmlText(name)} を削除しますか？</div><div style="font-size:12px; color:#666; background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px;">スタッフ一覧から物理削除はせず、ステータスを「退職」に変更して Google ログイン許可も外します。過去のシフト履歴は残ります。</div><button class="btn-main" style="background:var(--red-text);" onclick='executeStaffDelete(${escapeJsArg(name)})'>削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>`);
+    function executeStaffEdit(rowNumber) { doToast('更新中...'); closeModal(); adminRunner('更新エラー').withSuccessHandler(r=>{doToast(r.message);loadData(currentRecruitId);}).updateAdminStaffStatus(rowNumber, document.getElementById('es-status').value, document.getElementById('es-role').value, document.getElementById('es-note').value, SESSION_TOKEN); }
+    function confirmStaffDelete(rowNumber, name) {
+      showModal(`<div style="font-weight:bold; color:var(--red-text); margin-bottom:12px; font-size:18px;">スタッフを削除</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:12px;">${escapeHtmlText(name)} を削除しますか？</div><div style="font-size:12px; color:#666; background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px;">スタッフ一覧から物理削除はせず、ステータスを「退職」に変更して Google ログイン許可も外します。過去のシフト履歴は残ります。</div><button class="btn-main" style="background:var(--red-text);" onclick='executeStaffDelete(${escapeJsArg(rowNumber || "")})'>削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>`);
     }
-    function executeStaffDelete(name) { doToast('削除中...'); closeModal(); adminRunner('削除エラー').withSuccessHandler(r=>{doToast(r.message);loadData(currentRecruitId);}).deleteAdminStaff(name, SESSION_TOKEN); }
+    function executeStaffDelete(rowNumber) { doToast('削除中...'); closeModal(); adminRunner('削除エラー').withSuccessHandler(r=>{doToast(r.message);loadData(currentRecruitId);}).deleteAdminStaff(rowNumber, SESSION_TOKEN); }
     
     function addException() { const list = document.getElementById('exception-list'); if(!list) return; const div = document.createElement('div'); const uid = Date.now(); div.style.cssText = 'background:#f9f9f9; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #eee;'; div.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><input type="date" style="width:130px; padding:6px; font-size:12px; margin:0;"><select onchange="document.getElementById('tb-${uid}').style.display = this.value === 'close' ? 'none' : 'flex'" style="width:110px; padding:6px; font-size:12px; margin:0;"><option value="short">時間変更</option><option value="close">休業(終日)</option></select><button onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:var(--red-text); font-weight:bold;">✖</button></div><div id="tb-${uid}" style="display:flex; gap:5px; align-items:center;"><input type="time" style="flex:1; padding:6px; font-size:12px; margin:0;"><span style="font-size:12px; color:#888;">〜</span><input type="time" style="flex:1; padding:6px; font-size:12px; margin:0;"></div>`; list.appendChild(div); }
     function confirmStartRecruit() { openConfirmModal('📢 募集開始', '新しいシフトの募集を開始し、スタッフ全員に通知を送りますか？', '募集開始', 'executeStartRecruit()'); }

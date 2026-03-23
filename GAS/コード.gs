@@ -641,9 +641,19 @@ function saveAdminPassword(currentPassword, newPassword, sessionToken) {
 
 function registerStaff(req, sessionToken) {
   _requireSession_(sessionToken);
+  const sheet = SpreadsheetApp.openById(BASE_SS_ID).getSheetByName('スタッフ一覧');
+  const data = sheet.getDataRange().getDisplayValues();
+  const normalizedEmail = _normalizeEmail_(req.email);
+  for (let i = 1; i < data.length; i++) {
+    const rowStatus = String(data[i][0] || '');
+    const rowEmail = _normalizeEmail_(data[i][4]);
+    if (rowStatus === '退職') continue;
+    if (normalizedEmail && rowEmail && normalizedEmail === rowEmail) {
+      return { success: false, message: rowStatus === '申請中' ? 'このメールアドレスの申請は既に届いています' : 'このメールアドレスは既に登録済みです。ログインまたはプロフィール更新を利用してください' };
+    }
+  }
   const targetHours = parseTargetHoursValue(req.targetHours);
-  SpreadsheetApp.openById(BASE_SS_ID).getSheetByName('スタッフ一覧')
-    .appendRow(['申請中', req.name, "'" + req.pin, "'" + req.phone, req.email, req.note, '', targetHours || '']);
+  sheet.appendRow(['申請中', req.name, "'" + req.pin, "'" + req.phone, req.email, req.note, '', targetHours || '']);
   return { success: true, message: "店長に申請を送りました" };
 }
 
@@ -987,8 +997,8 @@ function getAdminInitData(recruitId, sessionToken) {
   if (staffSheet) {
     const staffData = staffSheet.getDataRange().getDisplayValues();
     for (let i = 1; i < staffData.length; i++) {
-      res.staffs.push({ status: staffData[i][0], name: staffData[i][1], phone: fixZero(staffData[i][3]), email: staffData[i][4], note: staffData[i][5], role: staffData[i][6], targetHours: parseTargetHoursValue(staffData[i][7]) });
-      if (staffData[i][0] === '申請中') res.alerts.push({ type: '新規登録', name: staffData[i][1], msg: 'スタッフ登録の申請があります' });
+      res.staffs.push({ rowNumber: i + 1, status: staffData[i][0], name: staffData[i][1], phone: fixZero(staffData[i][3]), email: staffData[i][4], note: staffData[i][5], role: staffData[i][6], targetHours: parseTargetHoursValue(staffData[i][7]) });
+      if (staffData[i][0] === '申請中') res.alerts.push({ type: '新規登録', name: staffData[i][1], msg: 'スタッフ登録の申請があります', staffRowNumber: i + 1 });
     }
   }
 
@@ -1083,12 +1093,19 @@ function startNewRecruit(data, sessionToken) {
   }
 }
 
-function updateAdminStaffStatus(name, status, role, note, sessionToken) {
+function updateAdminStaffStatus(staffRowNumberOrName, status, role, note, sessionToken) {
   _requireAdminSession_(sessionToken);
   const sheet = SpreadsheetApp.openById(BASE_SS_ID).getSheetByName('スタッフ一覧');
   const data = sheet.getDataRange().getDisplayValues();
+  const rowNumber = Number(staffRowNumberOrName);
+  if (isFinite(rowNumber) && rowNumber >= 2 && rowNumber <= data.length) {
+    sheet.getRange(rowNumber, 1).setValue(status);
+    sheet.getRange(rowNumber, 6).setValue(note);
+    sheet.getRange(rowNumber, 7).setValue(role);
+    return { success: true, message: "更新しました" };
+  }
   for (let i = 1; i < data.length; i++) {
-    if (data[i][1] == name) {
+    if (data[i][1] == staffRowNumberOrName) {
       sheet.getRange(i + 1, 1).setValue(status);
       sheet.getRange(i + 1, 6).setValue(note);
       sheet.getRange(i + 1, 7).setValue(role);
@@ -1098,15 +1115,25 @@ function updateAdminStaffStatus(name, status, role, note, sessionToken) {
   return { success: false, message: "エラー" };
 }
 
-function deleteAdminStaff(name, sessionToken) {
+function deleteAdminStaff(staffRowNumberOrName, sessionToken) {
   _requireAdminSession_(sessionToken);
   const ss = SpreadsheetApp.openById(BASE_SS_ID);
   const sheet = ss.getSheetByName('スタッフ一覧');
   if (!sheet) return { success: false, message: 'スタッフ一覧が見つかりません' };
 
   const data = sheet.getDataRange().getDisplayValues();
+  const rowNumber = Number(staffRowNumberOrName);
+  if (isFinite(rowNumber) && rowNumber >= 2 && rowNumber <= data.length) {
+    const email = _normalizeEmail_(data[rowNumber - 1][4]);
+    sheet.getRange(rowNumber, 1).setValue('退職');
+    const removedCount = _removeAllowedEmailEntriesByEmail_(email);
+    return {
+      success: true,
+      message: removedCount > 0 ? '退職に変更し、Googleログイン許可も解除しました' : '退職に変更しました'
+    };
+  }
   for (let i = 1; i < data.length; i++) {
-    if (data[i][1] == name) {
+    if (data[i][1] == staffRowNumberOrName) {
       const email = _normalizeEmail_(data[i][4]);
       sheet.getRange(i + 1, 1).setValue('退職');
       const removedCount = _removeAllowedEmailEntriesByEmail_(email);
