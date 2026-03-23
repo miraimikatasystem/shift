@@ -59,7 +59,10 @@
       <button class="sub-tab" onclick="switchSubTab(this, 's-conf')">確定</button>
     </div>
     
-    <select class="recruit-selector" onchange="onSelectRecruit(this)" style="margin-bottom:15px; border-color:var(--main-blue); color:var(--main-blue); font-weight:bold;"></select>
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px;">
+      <select class="recruit-selector" onchange="onSelectRecruit(this)" style="margin:0; flex:1; border-color:var(--main-blue); color:var(--main-blue); font-weight:bold;"></select>
+      <button class="btn-cancel" style="width:auto; margin:0; padding:12px 14px; color:var(--red-text); border-color:var(--red-text);" onclick="confirmDeleteRecruit()">🗑️ 削除</button>
+    </div>
 
     <div id="s-new" class="sub-view active">
       <div class="card" style="border-left: 4px solid var(--main-blue);">
@@ -208,6 +211,7 @@
 
         renderStaffList();
         renderAllowedEmailManager();
+        currentRecruitId = data.currentRecruitId || null;
         let optionsHtml = data.recruitList.map(r => `<option value="${r.id}" ${currentRecruitId===r.id?'selected':''}>${r.label}</option>`).join('');
         if(!optionsHtml) optionsHtml = '<option value="">募集履歴なし</option>';
         document.querySelectorAll('.recruit-selector').forEach(sel => { sel.innerHTML = optionsHtml; });
@@ -551,9 +555,28 @@
     }
     function executeStaffEdit(rowNumber) { doToast('更新中...'); closeModal(); adminRunner('更新エラー').withSuccessHandler(r=>{doToast(r.message);loadData(currentRecruitId);}).updateAdminStaffStatus(rowNumber, document.getElementById('es-status').value, document.getElementById('es-role').value, document.getElementById('es-note').value, SESSION_TOKEN); }
     function confirmStaffDelete(rowNumber, name) {
-      showModal(`<div style="font-weight:bold; color:var(--red-text); margin-bottom:12px; font-size:18px;">スタッフを削除</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:12px;">${escapeHtmlText(name)} を削除しますか？</div><div style="font-size:12px; color:#666; background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px;">スタッフ一覧から物理削除はせず、ステータスを「退職」に変更して Google ログイン許可も外します。過去のシフト履歴は残ります。</div><button class="btn-main" style="background:var(--red-text);" onclick='executeStaffDelete(${escapeJsArg(rowNumber || "")})'>削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>`);
+      showModal(`<div style="font-weight:bold; color:var(--red-text); margin-bottom:12px; font-size:18px;">スタッフを削除</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:12px;">${escapeHtmlText(name)} を削除しますか？</div><div style="font-size:12px; color:#666; background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px;">スタッフ一覧から完全に削除し、Google ログイン許可も外します。過去のシフト・通知に残る名前は「削除済みユーザー」に統一します。</div><button class="btn-main" style="background:var(--red-text);" onclick='executeStaffDelete(${escapeJsArg(rowNumber || "")})'>削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>`);
     }
     function executeStaffDelete(rowNumber) { doToast('削除中...'); closeModal(); adminRunner('削除エラー').withSuccessHandler(r=>{doToast(r.message);loadData(currentRecruitId);}).deleteAdminStaff(rowNumber, SESSION_TOKEN); }
+    function confirmDeleteRecruit() {
+      if (!currentRecruitId) {
+        openAlertModal('削除エラー', '削除する募集を選択してください');
+        return;
+      }
+      const recruit = (adminData.recruitList || []).find(r => r.id === currentRecruitId);
+      const label = recruit ? recruit.label : currentRecruitId;
+      showModal(`<div style="font-weight:bold; color:var(--red-text); margin-bottom:12px; font-size:18px;">募集を削除</div><div style="font-size:14px; font-weight:bold; color:#555; margin-bottom:12px;">${escapeHtmlText(label)} を削除しますか？</div><div style="font-size:12px; color:#666; background:#f8f9fa; padding:12px; border-radius:10px; margin-bottom:15px;">募集履歴一覧の行を削除し、紐づく募集スプレッドシートもゴミ箱へ移動します。</div><button class="btn-main" style="background:var(--red-text);" onclick="executeDeleteRecruit()">削除する</button><button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">キャンセル</button>`);
+    }
+    function executeDeleteRecruit() {
+      if (!currentRecruitId) return;
+      doToast('削除中...');
+      closeModal();
+      adminRunner('削除エラー').withSuccessHandler(r => {
+        doToast(r.message);
+        currentRecruitId = null;
+        loadData(null);
+      }).deleteRecruit(currentRecruitId, SESSION_TOKEN);
+    }
     
     function addException() { const list = document.getElementById('exception-list'); if(!list) return; const div = document.createElement('div'); const uid = Date.now(); div.style.cssText = 'background:#f9f9f9; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #eee;'; div.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><input type="date" style="width:130px; padding:6px; font-size:12px; margin:0;"><select onchange="document.getElementById('tb-${uid}').style.display = this.value === 'close' ? 'none' : 'flex'" style="width:110px; padding:6px; font-size:12px; margin:0;"><option value="short">時間変更</option><option value="close">休業(終日)</option></select><button onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:var(--red-text); font-weight:bold;">✖</button></div><div id="tb-${uid}" style="display:flex; gap:5px; align-items:center;"><input type="time" style="flex:1; padding:6px; font-size:12px; margin:0;"><span style="font-size:12px; color:#888;">〜</span><input type="time" style="flex:1; padding:6px; font-size:12px; margin:0;"></div>`; list.appendChild(div); }
     function confirmStartRecruit() { openConfirmModal('📢 募集開始', '新しいシフトの募集を開始し、スタッフ全員に通知を送りますか？', '募集開始', 'executeStartRecruit()'); }

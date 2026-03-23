@@ -10,6 +10,7 @@ const SESSION_TTL_SEC = 60 * 60;
 const BASE_MASTER_SHEET_NAMES = ['スタッフ一覧', '募集履歴一覧', 'お知らせ'];
 const ALLOWED_EMAILS_SHEET_NAME = 'アクセス許可メール';
 const ALLOWED_EMAILS_SHEET_HEADER = ['有効', 'メールアドレス', 'メモ', '更新日時', '更新者'];
+const DELETED_STAFF_LABEL = '削除済みユーザー';
 
 function getAdminPassword_() {
   return PropertiesService.getScriptProperties().getProperty(ADMIN_PASSWORD_PROPERTY_KEY) || '';
@@ -308,6 +309,53 @@ function _removeAllowedEmailEntriesByEmail_(email) {
     }
   }
   return removed;
+}
+
+function _extractSpreadsheetIdFromUrl_(url) {
+  const match = String(url || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : '';
+}
+
+function _replaceExactValueInColumn_(sheet, columnIndex, fromValue, toValue) {
+  if (!sheet || !fromValue || fromValue === toValue) return 0;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 0;
+  const range = sheet.getRange(2, columnIndex, lastRow - 1, 1);
+  const values = range.getDisplayValues();
+  let replaced = 0;
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0]) === String(fromValue)) {
+      values[i][0] = String(toValue);
+      replaced++;
+    }
+  }
+  if (replaced > 0) range.setValues(values);
+  return replaced;
+}
+
+function _replaceDeletedStaffReferences_(staffName) {
+  const sourceName = String(staffName || '');
+  if (!sourceName) return 0;
+
+  const ss = SpreadsheetApp.openById(BASE_SS_ID);
+  let replaced = 0;
+
+  replaced += _replaceExactValueInColumn_(ss.getSheetByName('お知らせ'), 2, sourceName, DELETED_STAFF_LABEL);
+
+  const historySheet = ss.getSheetByName('募集履歴一覧');
+  if (!historySheet) return replaced;
+
+  const historyData = historySheet.getDataRange().getDisplayValues();
+  for (let i = 1; i < historyData.length; i++) {
+    const recruitFileId = _extractSpreadsheetIdFromUrl_(historyData[i][5]);
+    if (!recruitFileId) continue;
+    try {
+      const recruitSs = SpreadsheetApp.openById(recruitFileId);
+      replaced += _replaceExactValueInColumn_(recruitSs.getSheetByName('提出情報'), 2, sourceName, DELETED_STAFF_LABEL);
+    } catch (e) {}
+  }
+
+  return replaced;
 }
 
 function _copyBaseMasterSheet_(sourceSs, targetSs, sheetName) {
@@ -1124,26 +1172,52 @@ function deleteAdminStaff(staffRowNumberOrName, sessionToken) {
   const data = sheet.getDataRange().getDisplayValues();
   const rowNumber = Number(staffRowNumberOrName);
   if (isFinite(rowNumber) && rowNumber >= 2 && rowNumber <= data.length) {
+    const staffName = String(data[rowNumber - 1][1] || '');
     const email = _normalizeEmail_(data[rowNumber - 1][4]);
-    sheet.getRange(rowNumber, 1).setValue('退職');
+    _replaceDeletedStaffReferences_(staffName);
+    sheet.deleteRow(rowNumber);
     const removedCount = _removeAllowedEmailEntriesByEmail_(email);
     return {
       success: true,
-      message: removedCount > 0 ? '退職に変更し、Googleログイン許可も解除しました' : '退職に変更しました'
+      message: removedCount > 0 ? 'スタッフを削除し、Googleログイン許可も解除しました' : 'スタッフを削除しました'
     };
   }
   for (let i = 1; i < data.length; i++) {
     if (data[i][1] == staffRowNumberOrName) {
+      const staffName = String(data[i][1] || '');
       const email = _normalizeEmail_(data[i][4]);
-      sheet.getRange(i + 1, 1).setValue('退職');
+      _replaceDeletedStaffReferences_(staffName);
+      sheet.deleteRow(i + 1);
       const removedCount = _removeAllowedEmailEntriesByEmail_(email);
       return {
         success: true,
-        message: removedCount > 0 ? '退職に変更し、Googleログイン許可も解除しました' : '退職に変更しました'
+        message: removedCount > 0 ? 'スタッフを削除し、Googleログイン許可も解除しました' : 'スタッフを削除しました'
       };
     }
   }
   return { success: false, message: '対象スタッフが見つかりません' };
+}
+
+function deleteRecruit(recruitId, sessionToken) {
+  _requireAdminSession_(sessionToken);
+  if (!recruitId) return { success: false, message: '削除対象の募集が見つかりません' };
+
+  const historySheet = SpreadsheetApp.openById(BASE_SS_ID).getSheetByName('募集履歴一覧');
+  if (!historySheet) return { success: false, message: '募集履歴一覧が見つかりません' };
+
+  const data = historySheet.getDataRange().getDisplayValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][2] === recruitId) {
+      const recruitFileId = _extractSpreadsheetIdFromUrl_(data[i][5]);
+      historySheet.deleteRow(i + 1);
+      if (recruitFileId) {
+        try { DriveApp.getFileById(recruitFileId).setTrashed(true); } catch (e) {}
+      }
+      return { success: true, message: '募集を削除しました' };
+    }
+  }
+
+  return { success: false, message: '対象の募集が見つかりません' };
 }
 
 function saveReqDefaults(recruitId, defaults, sessionToken) {
