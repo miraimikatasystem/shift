@@ -2,7 +2,6 @@ const AI_API_KEY = PropertiesService.getScriptProperties().getProperty('AI_API_K
 const LEGACY_BASE_SS_ID = '1aS_u3Fyj2jwY_Obcrb19iCFcrOF1k2Iy92lcqXkaLzA';
 const BASE_SS_ID = '1Ecfu_arUc8wZOLyMSEadDGCa0WHwtrhbbu13JCG-N_4';
 const TEMPLATE_SS_ID = '1CDL3xOVAvdxrcX30bNyEPdUVqeri83OcIt0wIaA2QOY';
-const FOLDER_ID = '1AWL9D8mbZXeIQIEIHT-jlpiXKRFJxgAb';
 const ADMIN_PASSWORD_PROPERTY_KEY = 'ADMIN_PASSWORD';
 const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
 const GOOGLE_OAUTH_CLIENT_ID = PropertiesService.getScriptProperties().getProperty('GOOGLE_OAUTH_CLIENT_ID') || '';
@@ -18,6 +17,13 @@ function getAdminPassword_() {
 
 function setAdminPassword_(password) {
   PropertiesService.getScriptProperties().setProperty(ADMIN_PASSWORD_PROPERTY_KEY, String(password || ''));
+}
+
+function getBaseSpreadsheetFolder_() {
+  const baseFile = DriveApp.getFileById(BASE_SS_ID);
+  const parents = baseFile.getParents();
+  if (!parents.hasNext()) throw new Error('ベースシートの親フォルダを取得できませんでした');
+  return parents.next();
 }
 
 function doPost(e) {
@@ -391,7 +397,7 @@ function migrateLegacyBaseToCurrentBase() {
 }
 
 function setupPermissions() {
-  DriveApp.getFolderById(FOLDER_ID);
+  getBaseSpreadsheetFolder_();
   DriveApp.getFileById(TEMPLATE_SS_ID);
   SpreadsheetApp.openById(BASE_SS_ID);
   ensureAllowedEmailsSheet_();
@@ -1116,7 +1122,7 @@ function getAdminInitData(recruitId, sessionToken) {
 function startNewRecruit(data, sessionToken) {
   _requireAdminSession_(sessionToken);
   try {
-    const folder = DriveApp.getFolderById(FOLDER_ID);
+    const folder = getBaseSpreadsheetFolder_();
     const newFile = DriveApp.getFileById(TEMPLATE_SS_ID).makeCopy(`シフト募集_${data.startDate}〜${data.endDate}`, folder);
 
     const recruitSs = SpreadsheetApp.openById(newFile.getId());
