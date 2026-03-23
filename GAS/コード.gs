@@ -661,14 +661,12 @@ function authenticateAdmin(password, sessionToken) {
   if (!adminPassword) return { success: false, message: '管理者パスワードが未設定です。Script Properties に ADMIN_PASSWORD を設定してください。' };
   if (String(password || '') !== adminPassword) return { success: false, message: 'パスワードが違います' };
 
-  session.role = 'admin';
-  session.expiresAt = Date.now() + (SESSION_TTL_SEC * 1000);
-  _saveSession_(sessionToken, session);
+  const adminSession = _createSession_(session.email, 'admin');
   const baseUrl = ScriptApp.getService().getUrl();
   return {
     success: true,
-    adminSessionToken: sessionToken,
-    redirectUrl: baseUrl ? (baseUrl + '?view=admin&st=' + encodeURIComponent(sessionToken)) : ''
+    adminSessionToken: adminSession.token,
+    redirectUrl: baseUrl ? (baseUrl + '?view=admin&st=' + encodeURIComponent(adminSession.token)) : ''
   };
 }
 
