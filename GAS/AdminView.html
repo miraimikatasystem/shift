@@ -190,7 +190,7 @@
         
         const alertBox = document.getElementById('admin-alerts');
         if(!data.alerts || data.alerts.length === 0) alertBox.innerHTML = '<div style="font-size:12px; color:#888; padding:10px;">お知らせはありません</div>'; 
-        else alertBox.innerHTML = data.alerts.map(a => `<div class="card" style="border-left:4px solid ${a.type==='変更申請'?'var(--red-text)':(a.type==='立候補'?'var(--orange-text)':'var(--main-blue)')}; padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:10px; font-weight:bold; color:#888;">${a.type}</div><div style="font-weight:bold; font-size:14px;">${a.name}</div><div style="font-size:11px; color:#555;">${a.msg}</div></div><button style="background:var(--light-blue); color:var(--main-blue); border:none; border-radius:6px; font-size:10px; font-weight:bold; padding:8px 12px;" onclick="switchTab(document.getElementById('btn-shift'), 'pg-shift'); switchSubTab(document.querySelector('[onclick*=\\'s-conf\\']'), 's-conf');">確認</button></div>`).join('');
+        else alertBox.innerHTML = data.alerts.map(a => `<div class="card" style="border-left:4px solid ${a.type==='変更申請'?'var(--red-text)':(a.type==='立候補'?'var(--orange-text)':'var(--main-blue)')}; padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:10px; font-weight:bold; color:#888;">${escapeHtmlText(a.type)}</div><div style="font-weight:bold; font-size:14px;">${escapeHtmlText(a.name)}</div><div style="font-size:11px; color:#555;">${escapeHtmlText(a.msg)}</div></div><button style="background:var(--light-blue); color:var(--main-blue); border:none; border-radius:6px; font-size:10px; font-weight:bold; padding:8px 12px;" onclick='openAlertTarget(${escapeJsArg(a.type)}, ${escapeJsArg(a.name)})'>確認</button></div>`).join('');
 
         document.getElementById('home-today-date').innerText = data.todayDateStr || '';
         const todayBox = document.getElementById('admin-today-shift');
@@ -219,11 +219,18 @@
     function renderStaffList() {
       const filter = document.getElementById('staff-filter').value;
       const staffBox = document.getElementById('admin-staff-list');
+      const counts = { '稼働中': 0, '申請中': 0, '休職': 0, '退職': 0 };
+      (adminData.staffs || []).forEach(s => { if (Object.prototype.hasOwnProperty.call(counts, s.status)) counts[s.status]++; });
       let filtered = adminData.staffs;
       if (filter !== 'すべて') filtered = filtered.filter(s => s.status === filter);
-      if(filtered.length === 0) staffBox.innerHTML = '<div style="font-size:12px; color:#ccc; text-align:center; padding:20px;">該当スタッフがいません</div>';
+      let hintHtml = '';
+      const hiddenSummaries = Object.keys(counts).filter(k => k !== filter && counts[k] > 0).map(k => `${k}${counts[k]}件`);
+      if (filter !== 'すべて' && hiddenSummaries.length > 0) {
+        hintHtml = `<div style="font-size:11px; color:#666; background:#f8f9fa; border:1px solid #eee; border-radius:10px; padding:10px; margin-bottom:10px;">現在は「${escapeHtmlText(filter)}」のみ表示中です。${escapeHtmlText(hiddenSummaries.join(' / '))} はフィルタ切替で確認できます。</div>`;
+      }
+      if(filtered.length === 0) staffBox.innerHTML = hintHtml + '<div style="font-size:12px; color:#ccc; text-align:center; padding:20px;">該当スタッフがいません</div>';
       else {
-         staffBox.innerHTML = filtered.map(s => {
+         staffBox.innerHTML = hintHtml + filtered.map(s => {
            let statusColor = s.status === '稼働中' ? 'var(--green)' : (s.status === '申請中' ? 'var(--orange)' : '#ccc');
            let statusTextColor = s.status === '稼働中' ? 'var(--green-text)' : (s.status === '申請中' ? '#fff' : '#666');
            const modalArgs = [
@@ -237,6 +244,29 @@
            return `<div class="card" onclick='openStaffEditModal(${modalArgs})' style="cursor:pointer;"><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-weight:bold; font-size:16px;">${escapeHtmlText(s.name)} <span style="font-size:10px; color:#888; font-weight:normal;">${escapeHtmlText(s.role)}</span></div><span style="background:${statusColor}; color:${statusTextColor}; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold;">${escapeHtmlText(s.status)}</span></div><div style="font-size:11px; color:#888; margin-top:5px;">☎ ${escapeHtmlText(s.phone)} | ✉ ${escapeHtmlText(s.email)}</div></div>`;
          }).join('');
       }
+    }
+
+    function setStaffFilter(value) {
+      const filter = document.getElementById('staff-filter');
+      if (!filter) return;
+      filter.value = value;
+      renderStaffList();
+    }
+
+    function openPendingStaffByName(name) {
+      const staff = (adminData.staffs || []).find(s => s.name === name);
+      switchTab(document.getElementById('btn-staff'), 'pg-staff');
+      setStaffFilter('申請中');
+      if (staff) openStaffEditModal(staff.name, staff.phone, staff.email, staff.status, staff.role, staff.note || '');
+    }
+
+    function openAlertTarget(type, name) {
+      if (type === '新規登録') {
+        openPendingStaffByName(name);
+        return;
+      }
+      switchTab(document.getElementById('btn-shift'), 'pg-shift');
+      switchSubTab(document.querySelector("[onclick*='s-conf']"), 's-conf');
     }
 
     function buildAllowedEmailRow(entry = {}) {
