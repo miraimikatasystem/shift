@@ -1,13 +1,13 @@
 const AI_API_KEY = PropertiesService.getScriptProperties().getProperty('AI_API_KEY');
-const LEGACY_BASE_SS_ID = '1P7nz8hmV0MtG6lg88JlivMBAwzglV64_PQh-Jlw2FfQ';
-const BASE_SS_ID = '1aS_u3Fyj2jwY_Obcrb19iCFcrOF1k2Iy92lcqXkaLzA';
+const LEGACY_BASE_SS_ID = '1aS_u3Fyj2jwY_Obcrb19iCFcrOF1k2Iy92lcqXkaLzA';
+const BASE_SS_ID = '1Ecfu_arUc8wZOLyMSEadDGCa0WHwtrhbbu13JCG-N_4';
 const TEMPLATE_SS_ID = '1CDL3xOVAvdxrcX30bNyEPdUVqeri83OcIt0wIaA2QOY';
 const FOLDER_ID = '1AWL9D8mbZXeIQIEIHT-jlpiXKRFJxgAb';
 const ADMIN_PASSWORD_PROPERTY_KEY = 'ADMIN_PASSWORD';
 const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
 const GOOGLE_OAUTH_CLIENT_ID = PropertiesService.getScriptProperties().getProperty('GOOGLE_OAUTH_CLIENT_ID') || '';
 const SESSION_TTL_SEC = 60 * 60;
-const BASE_MASTER_SHEET_NAMES = ['スタッフ一覧', '募集履歴一覧', 'お知らせ'];
+const BASE_MASTER_SHEET_NAMES = ['スタッフ一覧', '募集履歴一覧', 'お知らせ', 'アクセス許可メール'];
 const ALLOWED_EMAILS_SHEET_NAME = 'アクセス許可メール';
 const ALLOWED_EMAILS_SHEET_HEADER = ['有効', 'メールアドレス', 'メモ', '更新日時', '更新者'];
 const DELETED_STAFF_LABEL = '削除済みユーザー';
