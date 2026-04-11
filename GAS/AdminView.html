@@ -32,6 +32,15 @@
     #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
     .alert-cell { background: #ffebee !important; border: 2px solid #c62828 !important; }
     .vol-cell { background: #fff3e0 !important; border: 2px solid #ef6c00 !important; }
+    .req-slot-cell { min-width: 78px; }
+    .req-slot-cell.priority-active { background: #fff7ed !important; }
+    .req-slot-input-wrap { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+    .priority-toggle { width: 100%; padding: 4px 0; border-radius: 999px; border: 1px solid #fdba74; background: white; color: #c2410c; font-size: 10px; font-weight: 900; cursor: pointer; }
+    .priority-toggle.active { background: #fff3e0; border-color: #f59e0b; color: #9a3412; }
+    .priority-summary { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; font-size: 12px; font-weight: bold; }
+    .priority-picker-cell { min-width: 64px; background: #fff; cursor: pointer; transition: 0.2s; }
+    .priority-picker-cell.active { background: #fff3e0 !important; color: #9a3412; box-shadow: inset 0 0 0 2px #f59e0b; }
+    .priority-picker-cell .badge { display: inline-block; padding: 2px 6px; border-radius: 999px; border: 1px solid #fdba74; font-size: 9px; font-weight: 900; color: #c2410c; background: white; }
   </style>
 </head>
 <body>
@@ -70,6 +79,11 @@
         <div style="font-size:12px; color:#888;">対象期間</div>
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;"><input type="date" id="rec-start"> 〜 <input type="date" id="rec-end"></div>
         <div style="font-size:12px; color:#888;">提出期限</div><input type="date" id="rec-deadline" style="margin-bottom:10px;">
+        <div style="font-size:12px; color:#888;">募集メッセージ (任意)</div>
+        <textarea id="rec-message" rows="3" placeholder="例: 土日の夕方は特に入っていただけると助かります。"></textarea>
+        <button class="btn-cancel" style="margin-top:0; border-color:#fdba74; color:#c2410c;" onclick="openNewRecruitPriorityModal()">優先募集枠を選ぶ</button>
+        <div id="rec-priority-summary" class="priority-summary">優先募集枠は未選択です。</div>
+        <div style="font-size:11px; color:#666;">募集通知には提出リンクが自動で入ります。</div>
         <button class="btn-main" style="margin-top:15px;" onclick="confirmStartRecruit()">📢 募集を開始する (全員に通知)</button>
       </div>
     </div>
@@ -154,10 +168,17 @@
     const SESSION_TOKEN = <?!= JSON.stringify(sessionToken) ?>;
     const SESSION_EMAIL = <?!= JSON.stringify(sessionEmail) ?>;
     const SESSION_ROLE = <?!= JSON.stringify(sessionRole) ?>;
+    const PARENT_MESSAGING_ENABLED = <?!= JSON.stringify(parentMessagingEnabled) ?>;
     let adminData = { allowedEmails: [] }; let currentRecruitId = null;
-    window.onload = function() { loadData(null); };
+    let pendingRecruitPriorityMap = {};
+    window.onload = function() {
+      bindNewRecruitInputs();
+      updatePendingRecruitPrioritySummary();
+      loadData(null);
+    };
 
     function notifySessionExpired(message) {
+      if (!PARENT_MESSAGING_ENABLED) return;
       try {
         if (window.top && window.top !== window) {
           window.top.postMessage({ type: 'gas-session-expired', message: message || '' }, '*');
@@ -183,6 +204,133 @@
 
     function escapeJsArg(value) {
       return JSON.stringify(String(value == null ? '' : value)).replace(/'/g, '&#39;');
+    }
+
+    function buildRecruitDateLabels(startValue, endValue) {
+      if (!startValue || !endValue) return [];
+      const start = new Date(`${startValue}T00:00:00`);
+      const end = new Date(`${endValue}T00:00:00`);
+      if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return [];
+      const days = ['(日)', '(月)', '(火)', '(水)', '(木)', '(金)', '(土)'];
+      const dates = [];
+      const current = new Date(start);
+      while (current <= end) {
+        dates.push(`${current.getMonth() + 1}/${current.getDate()}${days[current.getDay()]}`);
+        current.setDate(current.getDate() + 1);
+      }
+      return dates;
+    }
+
+    function buildRecruitTimeLabels(startValue = '8:00', endValue = '20:00') {
+      const startHour = parseInt(String(startValue || '8:00').split(':')[0], 10);
+      const endHour = parseInt(String(endValue || '20:00').split(':')[0], 10);
+      const safeStart = isFinite(startHour) ? startHour : 8;
+      const safeEnd = isFinite(endHour) ? endHour : 20;
+      const times = [];
+      for (let h = safeStart; h < safeEnd; h++) times.push(`${h}:00`);
+      return times;
+    }
+
+    function getPendingRecruitPrioritySelection() {
+      const recDefStart = document.getElementById('rec-def-start');
+      const recDefEnd = document.getElementById('rec-def-end');
+      const dates = buildRecruitDateLabels(document.getElementById('rec-start').value, document.getElementById('rec-end').value);
+      const times = buildRecruitTimeLabels(recDefStart ? recDefStart.value : '8:00', recDefEnd ? recDefEnd.value : '20:00');
+      const allowed = {};
+      dates.forEach(d => times.forEach(t => { allowed[`${d}|${t}`] = true; }));
+      const slots = [];
+      Object.keys(pendingRecruitPriorityMap).forEach(key => {
+        if (!allowed[key]) {
+          delete pendingRecruitPriorityMap[key];
+          return;
+        }
+        const parts = key.split('|');
+        slots.push({ date: parts[0], time: parts[1] });
+      });
+      slots.sort((a, b) => {
+        if (a.date !== b.date) return String(a.date).localeCompare(String(b.date));
+        return parseInt(a.time, 10) - parseInt(b.time, 10);
+      });
+      return slots;
+    }
+
+    function updatePendingRecruitPrioritySummary() {
+      const summary = document.getElementById('rec-priority-summary');
+      if (!summary) return;
+      const count = getPendingRecruitPrioritySelection().length;
+      summary.textContent = count > 0 ? `優先募集枠を ${count} 枠選択中です。` : '優先募集枠は未選択です。';
+    }
+
+    function bindNewRecruitInputs() {
+      ['rec-start', 'rec-end', 'rec-def-start', 'rec-def-end'].forEach(id => {
+        const elem = document.getElementById(id);
+        if (!elem || elem.dataset.priorityBound === '1') return;
+        elem.dataset.priorityBound = '1';
+        elem.addEventListener('change', updatePendingRecruitPrioritySummary);
+      });
+    }
+
+    function renderNewRecruitPriorityCell(cell) {
+      const isActive = cell.dataset.active === '1';
+      cell.classList.toggle('active', isActive);
+      cell.innerHTML = isActive ? '<span class="badge">優先</span>' : '';
+    }
+
+    function updateNewRecruitPriorityModalSummary() {
+      const modalCount = document.getElementById('new-rec-priority-count');
+      if (modalCount) modalCount.textContent = String(getPendingRecruitPrioritySelection().length);
+      updatePendingRecruitPrioritySummary();
+    }
+
+    function toggleNewRecruitPriorityCell(cell) {
+      const key = `${cell.dataset.date}|${cell.dataset.time}`;
+      const nextActive = cell.dataset.active !== '1';
+      cell.dataset.active = nextActive ? '1' : '0';
+      if (nextActive) pendingRecruitPriorityMap[key] = true;
+      else delete pendingRecruitPriorityMap[key];
+      renderNewRecruitPriorityCell(cell);
+      updateNewRecruitPriorityModalSummary();
+    }
+
+    function clearNewRecruitPrioritySelection() {
+      pendingRecruitPriorityMap = {};
+      document.querySelectorAll('.priority-picker-cell').forEach(cell => {
+        cell.dataset.active = '0';
+        renderNewRecruitPriorityCell(cell);
+      });
+      updateNewRecruitPriorityModalSummary();
+    }
+
+    function openNewRecruitPriorityModal() {
+      const recDefStart = document.getElementById('rec-def-start');
+      const recDefEnd = document.getElementById('rec-def-end');
+      const dates = buildRecruitDateLabels(document.getElementById('rec-start').value, document.getElementById('rec-end').value);
+      const times = buildRecruitTimeLabels(recDefStart ? recDefStart.value : '8:00', recDefEnd ? recDefEnd.value : '20:00');
+      if (dates.length === 0) {
+        openAlertModal('優先募集枠', '先に対象期間を入力してください。');
+        return;
+      }
+      getPendingRecruitPrioritySelection();
+
+      let html = `<div style="font-weight:bold; color:#c2410c; margin-bottom:12px; font-size:18px;">優先募集枠を選ぶ</div>`;
+      html += `<div style="font-size:12px; color:#666; margin-bottom:10px;">「優先」を付けた枠は、募集開始直後からスタッフ画面でオレンジ表示されます。</div>`;
+      html += `<div style="font-size:12px; font-weight:bold; color:#9a3412; margin-bottom:10px;">選択中: <span id="new-rec-priority-count">${getPendingRecruitPrioritySelection().length}</span>枠</div>`;
+      html += `<div class="table-wrapper"><table class="matrix-table"><thead><tr><th></th>`;
+      dates.forEach(d => { html += `<th>${d}</th>`; });
+      html += `</tr></thead><tbody>`;
+      times.forEach(t => {
+        html += `<tr><th>${t}~</th>`;
+        dates.forEach(d => {
+          const key = `${d}|${t}`;
+          const isActive = !!pendingRecruitPriorityMap[key];
+          html += `<td class="priority-picker-cell ${isActive ? 'active' : ''}" data-date="${d}" data-time="${t}" data-active="${isActive ? '1' : '0'}" onclick="toggleNewRecruitPriorityCell(this)">${isActive ? '<span class="badge">優先</span>' : ''}</td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table></div>`;
+      html += `<div style="display:flex; gap:10px; margin-top:12px;"><button class="btn-main" style="margin:0; flex:1; background:#f59e0b;" onclick="closeModal()">選択を保存</button><button class="btn-cancel" style="margin:0; flex:1;" onclick="clearNewRecruitPrioritySelection()">全部クリア</button></div>`;
+      html += `<button class="btn-cancel" style="border:none; background:transparent;" onclick="closeModal()">閉じる</button>`;
+      showModal(html);
     }
 
     function loadData(targetRecruitId) {
@@ -440,7 +588,10 @@
                const keyPipe = `${d}|${t}`;
                savedNum = parseInt(data.reqMap[keySpace], 10) || parseInt(data.reqMap[keyPipe], 10) || 0;
              }
-             reqHtml += `<td><input type="number" class="input-small slot-input" data-date="${d}" data-time="${t}" value="${savedNum}"></td>`;
+             const priorityKeySpace = `${d} ${t}`;
+             const priorityKeyPipe = `${d}|${t}`;
+             const isPriority = !!((data.priorityReqMap || {})[priorityKeySpace] || (data.priorityReqMap || {})[priorityKeyPipe]);
+             reqHtml += `<td class="req-slot-cell ${isPriority ? 'priority-active' : ''}"><div class="req-slot-input-wrap"><input type="number" class="input-small slot-input" data-date="${d}" data-time="${t}" value="${savedNum}"><button type="button" class="priority-toggle ${isPriority ? 'active' : ''}" data-priority="${isPriority ? '1' : '0'}" onclick="togglePrioritySlot(this)">優先</button></div></td>`;
 
              let eCell = ''; let eShifts = data.shifts.filter(s => s.date == d && s.time == t && (s.status === '仮決定' || s.status === '確定'));
              eShifts.forEach(s => { eCell += `<div style="background:var(--light-blue); color:var(--main-blue); border-radius:4px; padding:4px; font-size:10px; margin-bottom:2px; font-weight:bold; ${isConfirmed?'opacity:0.6;':'cursor:pointer;'}" ${isConfirmed?'':`onclick="openManualEditModal('${d}','${t}','${s.name}')"`}>${s.name}</div>`; });
@@ -465,7 +616,7 @@
         });
         defaultHtml += `</tr>`;
       });
-      reqBox.innerHTML = reqHtml + `</tbody></table></div>`;
+      reqBox.innerHTML = reqHtml + `</tbody></table></div><div style="font-size:11px; color:#666;">「優先」をONにした枠は、スタッフ画面でオレンジの優先表示になります。表示のみで、AI編成や強制ルールには使いません。</div>`;
       defaultBox.innerHTML = defaultHtml + `</tbody></table></div><div style="font-size:11px; color:#666;">デフォルトを保存後、「実表へ反映」で日付ごとの必要人数へ展開します。展開後も上段の表で個別調整できます。</div>`;
 
       const assignedHours = {};
@@ -579,6 +730,12 @@
     }
     
     function addException() { const list = document.getElementById('exception-list'); if(!list) return; const div = document.createElement('div'); const uid = Date.now(); div.style.cssText = 'background:#f9f9f9; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #eee;'; div.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><input type="date" style="width:130px; padding:6px; font-size:12px; margin:0;"><select onchange="document.getElementById('tb-${uid}').style.display = this.value === 'close' ? 'none' : 'flex'" style="width:110px; padding:6px; font-size:12px; margin:0;"><option value="short">時間変更</option><option value="close">休業(終日)</option></select><button onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:var(--red-text); font-weight:bold;">✖</button></div><div id="tb-${uid}" style="display:flex; gap:5px; align-items:center;"><input type="time" style="flex:1; padding:6px; font-size:12px; margin:0;"><span style="font-size:12px; color:#888;">〜</span><input type="time" style="flex:1; padding:6px; font-size:12px; margin:0;"></div>`; list.appendChild(div); }
+    function togglePrioritySlot(btn) {
+      btn.classList.toggle('active');
+      btn.dataset.priority = btn.classList.contains('active') ? '1' : '0';
+      const cell = btn.closest('.req-slot-cell');
+      if (cell) cell.classList.toggle('priority-active', btn.classList.contains('active'));
+    }
     function confirmStartRecruit() { openConfirmModal('📢 募集開始', '新しいシフトの募集を開始し、スタッフ全員に通知を送りますか？', '募集開始', 'executeStartRecruit()'); }
     function executeStartRecruit() {
       doToast('作成中...');
@@ -591,16 +748,27 @@
         deadline: document.getElementById('rec-deadline').value,
         defaultStart: recDefStart ? recDefStart.value : '8:00',
         defaultEnd: recDefEnd ? recDefEnd.value : '20:00',
-        exceptions: "[]"
+        exceptions: "[]",
+        message: document.getElementById('rec-message').value,
+        prioritySlots: getPendingRecruitPrioritySelection()
       };
-      adminRunner('作成エラー').withSuccessHandler(r=>{doToast(r.message);loadData(null);}).startNewRecruit(data, SESSION_TOKEN);
+      adminRunner('作成エラー').withSuccessHandler(r=>{
+        doToast(r.message);
+        if (r && r.success) {
+          pendingRecruitPriorityMap = {};
+          updatePendingRecruitPrioritySummary();
+        }
+        loadData(null);
+      }).startNewRecruit(data, SESSION_TOKEN);
     }
 
     function saveCurrentReqSlots() {
       if (!currentRecruitId) return alert('募集を選択してください');
       const allSlots = [];
       document.querySelectorAll('.slot-input').forEach(i => {
-        allSlots.push({ date: i.dataset.date, time: i.dataset.time, num: parseInt(i.value, 10) || 0 });
+        const cell = i.closest('.req-slot-cell');
+        const priorityBtn = cell ? cell.querySelector('.priority-toggle') : null;
+        allSlots.push({ date: i.dataset.date, time: i.dataset.time, num: parseInt(i.value, 10) || 0, priority: !!(priorityBtn && priorityBtn.dataset.priority === '1') });
       });
       adminRunner('保存エラー').withSuccessHandler(r => {
         doToast(r.message);
@@ -634,8 +802,10 @@
       let hasRequired = false;
       document.querySelectorAll('.slot-input').forEach(i => {
         const num = parseInt(i.value, 10) || 0;
+        const cell = i.closest('.req-slot-cell');
+        const priorityBtn = cell ? cell.querySelector('.priority-toggle') : null;
         if (num > 0) hasRequired = true;
-        allSlots.push({ date: i.dataset.date, time: i.dataset.time, num: num });
+        allSlots.push({ date: i.dataset.date, time: i.dataset.time, num: num, priority: !!(priorityBtn && priorityBtn.dataset.priority === '1') });
       });
       if(!hasRequired) return alert('必要人数を設定してください');
 

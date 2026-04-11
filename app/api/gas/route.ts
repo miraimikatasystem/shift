@@ -22,6 +22,10 @@ function asHttpStatus(raw: unknown, fallback: number): number {
   return fallback;
 }
 
+function summarizeUpstreamText(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
 export async function POST(req: Request) {
   if (!gasWebAppUrl) {
     return NextResponse.json(
@@ -60,14 +64,18 @@ export async function POST(req: Request) {
   }
 
   let gasBody: GasResponseBody = {};
+  let gasText = "";
   try {
-    gasBody = (await gasRes.json()) as GasResponseBody;
+    gasText = await gasRes.text();
+    gasBody = gasText ? (JSON.parse(gasText) as GasResponseBody) : {};
   } catch {
     gasBody = {
       status: gasRes.status,
       ok: false,
       code: "invalid_upstream_response",
-      message: "invalid response from gas",
+      message: gasText
+        ? `invalid response from gas: ${summarizeUpstreamText(gasText)}`
+        : "invalid response from gas",
     };
   }
 

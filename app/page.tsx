@@ -49,6 +49,32 @@ type GoogleIdentity = {
 
 const gasUrl = process.env.NEXT_PUBLIC_GAS_WEBAPP_URL;
 const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const googleAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_AUTH !== "false";
+const directTestBypassEnabled =
+  process.env.NEXT_PUBLIC_ENABLE_DIRECT_TEST_BYPASS === "true";
+const googleAuthUiEnabled = googleAuthEnabled && !directTestBypassEnabled;
+const directTestBypassToken =
+  process.env.NEXT_PUBLIC_DIRECT_TEST_BYPASS_TOKEN ||
+  "cafe-shift-direct-8f3c27d4a91b";
+const directTestUser: UserInfo = {
+  email: "direct-test@local",
+  name: "Direct Test",
+};
+
+function buildGasIframeUrl(
+  baseUrl: string,
+  view: "staff" | "admin",
+  directTestToken: string,
+  nonce: number,
+): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set("directTest", directTestToken);
+  url.searchParams.set("embedded", "1");
+  url.searchParams.set("_ts", String(nonce));
+  if (view === "admin") url.searchParams.set("view", "admin");
+  else url.searchParams.delete("view");
+  return url.toString();
+}
 
 function base64UrlDecode(value: string): string {
   const padded = value + "=".repeat((4 - (value.length % 4)) % 4);
@@ -86,17 +112,26 @@ function toUserMessage(error: unknown): string {
 }
 
 export default function Page() {
-  const [authState, setAuthState] = useState<AuthState>("checking");
-  const [user, setUser] = useState<UserInfo | null>(null);
+  const [authState, setAuthState] = useState<AuthState>(
+    directTestBypassEnabled ? "signed_in" : googleAuthUiEnabled ? "checking" : "signed_out",
+  );
+  const [user, setUser] = useState<UserInfo | null>(
+    directTestBypassEnabled ? directTestUser : null,
+  );
   const [scriptReady, setScriptReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [sessionToken, setSessionToken] = useState("");
   const [idToken, setIdToken] = useState("");
   const [iframeView, setIframeView] = useState<"staff" | "admin">("staff");
+  const [directTestNonce, setDirectTestNonce] = useState(0);
   const buttonRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bootstrapFormRef = useRef<HTMLFormElement | null>(null);
   const submittedSessionRef = useRef("");
+  const directTestIframeUrl =
+    gasUrl && directTestBypassEnabled && !sessionToken
+      ? buildGasIframeUrl(gasUrl, iframeView, directTestBypassToken, directTestNonce)
+      : "about:blank";
 
   const handleCredential = useCallback(async (response: GoogleCredentialResponse) => {
     if (!response.credential) {
@@ -147,6 +182,16 @@ export default function Page() {
       if (event.data?.type !== "gas-session-expired") return;
 
       submittedSessionRef.current = "";
+      if (directTestBypassEnabled) {
+        setUser(directTestUser);
+        setIdToken("");
+        setSessionToken("");
+        setIframeView("staff");
+        setAuthState("signed_in");
+        setErrorMessage("テスト用セッションを再発行しました。");
+        setDirectTestNonce((prev) => prev + 1);
+        return;
+      }
       setUser(null);
       setIdToken("");
       setSessionToken("");
@@ -169,6 +214,7 @@ export default function Page() {
   }, [authState, sessionToken, iframeView]);
 
   useEffect(() => {
+    if (!googleAuthUiEnabled) return;
     if (!googleClientId) {
       setAuthState("error");
       setErrorMessage("NEXT_PUBLIC_GOOGLE_CLIENT_ID が未設定です。");
@@ -206,14 +252,26 @@ export default function Page() {
 
   const handleSignOut = () => {
     const google = (window as Window & { google?: GoogleIdentity }).google;
-    if (google && user?.email) google.accounts.id.revoke(user.email, () => {});
-    if (google) google.accounts.id.disableAutoSelect();
+    if (googleAuthUiEnabled && google && user?.email) {
+      google.accounts.id.revoke(user.email, () => {});
+    }
+    if (googleAuthUiEnabled && google) google.accounts.id.disableAutoSelect();
 
-    if (idToken && sessionToken) {
+    if (sessionToken) {
       void callGasApi(idToken, "revokeSession", { sessionToken }).catch(() => undefined);
     }
 
     submittedSessionRef.current = "";
+    if (directTestBypassEnabled) {
+      setUser(directTestUser);
+      setIdToken("");
+      setSessionToken("");
+      setIframeView("staff");
+      setErrorMessage("");
+      setAuthState("signed_in");
+      setDirectTestNonce((prev) => prev + 1);
+      return;
+    }
     setUser(null);
     setIdToken("");
     setSessionToken("");
@@ -224,11 +282,13 @@ export default function Page() {
 
   return (
     <main className="page">
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        strategy="afterInteractive"
-        onLoad={() => setScriptReady(true)}
-      />
+      {googleAuthUiEnabled ? (
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="afterInteractive"
+          onLoad={() => setScriptReady(true)}
+        />
+      ) : null}
 
       {!gasUrl ? (
         <section className="notice">
@@ -237,12 +297,17 @@ export default function Page() {
             <code>NEXT_PUBLIC_GAS_WEBAPP_URL</code> にデプロイ済み Web アプリ URL を設定してください。
           </p>
         </section>
-      ) : !googleClientId ? (
+      ) : googleAuthUiEnabled && !googleClientId ? (
         <section className="notice">
           <h2>Google Client ID が未設定です</h2>
           <p>
             <code>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> を設定してください。
           </p>
+        </section>
+      ) : !googleAuthEnabled && !directTestBypassEnabled ? (
+        <section className="notice">
+          <h2>ログイン画面を停止中です</h2>
+          <p>この環境では Google 認証 UI を表示していません。</p>
         </section>
       ) : authState !== "signed_in" ? (
         <section className="notice">
@@ -255,17 +320,23 @@ export default function Page() {
         </section>
       ) : (
         <section className="appShell">
+          {directTestBypassEnabled ? (
+            <section className="notice" style={{ marginBottom: 12 }}>
+              <h2>テストモード</h2>
+              <p>Google認証をバイパスして GAS を直接表示しています。</p>
+            </section>
+          ) : null}
           <form ref={bootstrapFormRef} action={gasUrl} method="post" target="gas-app-frame" hidden>
             <input type="hidden" name="bootstrapSessionToken" value={sessionToken} />
             <input type="hidden" name="view" value={iframeView} />
           </form>
           <button type="button" onClick={handleSignOut} className="floatingSignOut">
-            Sign out
+            {directTestBypassEnabled ? "Reload Test" : "Sign out"}
           </button>
           <iframe
             ref={iframeRef}
             name="gas-app-frame"
-            src="about:blank"
+            src={directTestIframeUrl}
             title="GAS Web App"
             className="frame frameFullscreen"
             loading="lazy"

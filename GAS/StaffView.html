@@ -124,7 +124,12 @@
     .matrix-table tbody th { left: 0; }
     
     .cell { background: #fff; cursor: pointer; transition: 0.2s; }
-    .cell.selected { background: var(--main); color: white; }
+    .cell.priority-cell { background: #fff7ed; }
+    .cell.selected { background: var(--main) !important; color: white; }
+    .priority-static-cell { background: #fff7ed; }
+    .req-cell-inner { min-height: 26px; display: flex; align-items: center; justify-content: center; }
+    .priority-badge { display: inline-block; padding: 2px 6px; border-radius: 999px; border: 1px solid #fdba74; background: white; color: #c2410c; font-size: 9px; font-weight: 900; line-height: 1.2; }
+    .cell.selected .priority-badge, .priority-static-cell.priority-selected .priority-badge { background: rgba(255,255,255,0.18); color: white; border-color: rgba(255,255,255,0.45); }
     
     .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.95); display: none; height: 75px; border-top: 1px solid #eee; z-index: 2000; }
     .nav-btn { flex: 1; border: none; background: none; color: #888; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; opacity: 0.35; }
@@ -147,7 +152,8 @@
       <div style="font-size:24px; font-weight:900; color:var(--main); margin-bottom:20px;">☕ CAFE SHIFT</div>
       <div class="card" style="text-align:left;">
         <div style="font-size:12px; font-weight:800; color:#888;">お名前</div>
-        <input type="text" id="login-name">
+        <input type="text" id="login-name" lang="ja" autocomplete="name" autocapitalize="off" maxlength="40" placeholder="例: やまだ">
+        <div style="font-size:11px; color:#888; margin-top:-2px;">ひらがな・カタカナ・漢字でも入力できます</div>
         <div style="font-size:12px; font-weight:800; color:#888;">PINコード</div>
         <input type="password" id="login-pin" inputmode="numeric">
         <button class="btn-main" style="margin-top:20px;" onclick="runLogin()">ログインする</button>
@@ -162,7 +168,8 @@
     <div class="section-body">
       <div class="card">
         <div style="font-size:12px; font-weight:800; color:#888;">名前</div>
-        <input type="text" id="reg-name">
+        <input type="text" id="reg-name" lang="ja" autocomplete="name" autocapitalize="off" maxlength="40" placeholder="例: やまだ">
+        <div style="font-size:11px; color:#888; margin-top:-2px;">ひらがな・カタカナ・漢字でも登録できます</div>
         <div style="font-size:12px; font-weight:800; color:#888;">PINコード (3桁〜4桁)</div>
         <input type="password" id="reg-pin" inputmode="numeric">
         <div style="font-size:12px; font-weight:800; color:#888;">電話番号</div>
@@ -240,7 +247,8 @@
     <div class="section-body">
       <div class="card">
         <div style="font-size:12px; font-weight:800; color:#888;">名前</div>
-        <input type="text" id="set-name">
+        <input type="text" id="set-name" lang="ja" autocomplete="name" autocapitalize="off" maxlength="40" placeholder="例: やまだ">
+        <div style="font-size:11px; color:#888; margin-top:-2px;">ひらがな・カタカナ・漢字でも利用できます</div>
         <div style="font-size:12px; font-weight:800; color:#888;">PINコード</div>
         <input type="text" id="set-pin">
         <div style="font-size:12px; font-weight:800; color:#888;">電話番号</div>
@@ -270,10 +278,12 @@
     const SESSION_TOKEN = <?!= JSON.stringify(sessionToken) ?>;
     const SESSION_EMAIL = <?!= JSON.stringify(sessionEmail) ?>;
     const SESSION_ROLE = <?!= JSON.stringify(sessionRole) ?>;
+    const PARENT_MESSAGING_ENABLED = <?!= JSON.stringify(parentMessagingEnabled) ?>;
     let myName = "";
     let currentRecruitId = null;
 
     function notifySessionExpired(message) {
+      if (!PARENT_MESSAGING_ENABLED) return;
       try {
         if (window.top && window.top !== window) {
           window.top.postMessage({ type: 'gas-session-expired', message: message || '' }, '*');
@@ -291,6 +301,20 @@
 
     function staffRunner(title = 'エラー') {
       return google.script.run.withFailureHandler(function(err) { handleServerFailure(err, title); });
+    }
+
+    function escapeHtmlText(value) {
+      return String(value || '').replace(/[&<>"']/g, function(c) {
+        return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' })[c];
+      });
+    }
+
+    function renderPriorityBadge(isPriority) {
+      return isPriority ? '<div class="priority-badge">優先</div>' : '';
+    }
+
+    function toggleRequestCell(cell) {
+      cell.classList.toggle('selected');
     }
 
     // --- 🌟 確実なタブ切り替えロジック ---
@@ -380,7 +404,7 @@
           openAlertModal('エラー', (res && res.message) ? res.message : 'ログインできませんでした');
           return;
         }
-        if (res.adminSessionToken) {
+        if (PARENT_MESSAGING_ENABLED && res.adminSessionToken) {
           try {
             if (window.top && window.top !== window) {
               window.top.postMessage({ type: 'gas-switch-admin', sessionToken: res.adminSessionToken }, '*');
@@ -562,6 +586,11 @@
         }
         let canSubmit = (!isConfirmed && !isExpired && !isAdjusting);
         document.getElementById('recruit-alert').style.display = canSubmit ? 'block' : 'none';
+        const recruitMessageText = String(data.recruit.message || '').trim();
+        const recruitMessageHtml = recruitMessageText
+          ? `<div class="card" style="padding:12px; margin-bottom:12px; border-left:4px solid var(--orange);"><div style="font-size:11px; font-weight:900; color:#888;">店長からのメッセージ</div><div style="font-size:13px; font-weight:800; color:#555; margin-top:6px; line-height:1.7; white-space:pre-wrap;">${escapeHtmlText(recruitMessageText)}</div></div>`
+          : '';
+        const priorityHintHtml = `<div style="font-size:12px; font-weight:800; color:#b45309; background:#fff7ed; border:1px solid #fdba74; border-radius:10px; padding:10px; margin-bottom:12px;">オレンジの「優先」は、特に入ってほしい募集枠です。表示のみで、強制ではありません。</div>`;
 
         // テーブル作成
         let htmlHead = `<div class="table-wrapper"><table class="matrix-table"><thead><tr><th></th>`; 
@@ -581,6 +610,10 @@
           data.recruit.dates.forEach(function(d) {
             let isClosed = false; let isOut = false; 
             let ex = data.recruit.exceptions.find(function(e) { return e.formattedDate === d; });
+            const priorityKeySpace = `${d} ${t}`;
+            const priorityKeyPipe = `${d}|${t}`;
+            const isPriority = !!((data.priorityReqMap || {})[priorityKeySpace] || (data.priorityReqMap || {})[priorityKeyPipe]);
+            const priorityBadge = renderPriorityBadge(isPriority);
             
             if (ex) { 
               if (ex.type === 'close') isClosed = true; 
@@ -599,11 +632,14 @@
                let isSelected = data.shifts.some(function(s) { 
                  return s.status === '希望' && s.name === myName && s.date == d && s.time == t; 
                });
+               const reqCellClass = `${isSelected ? 'cell selected' : 'cell'}${isPriority ? ' priority-cell' : ''}`;
+               const subCellClass = `${isPriority ? 'priority-static-cell' : ''}${isSelected ? ' priority-selected' : ''}`.trim();
+               const subCellStyle = isSelected ? 'background:var(--main); color:white;' : '';
                
-               reqHtml += `<td class="${isSelected ? 'cell selected' : 'cell'}" data-date="${d}" data-time="${t}" style="${isSelected ? 'background:var(--main); color:white;' : ''}" onclick="this.classList.toggle('selected'); this.style.background=this.classList.contains('selected')?'var(--main)':''; this.style.color=this.classList.contains('selected')?'white':'';"></td>`;
-               subHtml += `<td style="${isSelected ? 'background:var(--main); color:white;' : ''}"></td>`;
+               reqHtml += `<td class="${reqCellClass}" data-date="${d}" data-time="${t}" onclick="toggleRequestCell(this)"><div class="req-cell-inner">${priorityBadge}</div></td>`;
+               subHtml += `<td class="${subCellClass}" style="${subCellStyle}"><div class="req-cell-inner">${priorityBadge}</div></td>`;
 
-               let cellContent = ""; 
+               let cellContent = isPriority ? `<div style="margin-bottom:4px;">${priorityBadge}</div>` : ""; 
                let hasVacancy = false; 
                let isVolunteering = data.shifts.some(function(s) { 
                  return s.status === '立候補' && s.name === myName && s.date == d && s.time == t; 
@@ -642,10 +678,10 @@
         
         if (canSubmit) {
           const commentText = String(data.submitComment || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          reqBox.innerHTML = reqHtml + htmlFoot + `<div style="font-size:12px; font-weight:800; color:#888; margin-bottom:4px;">コメント</div><textarea id="shift-comment" rows="3" placeholder="店長への共有事項があれば記入してください">${commentText}</textarea><button class="btn-main" style="margin-top:15px;" onclick="openConfirmModal('提出確認', '店長に送信しますか？', '送信', 'executeSubmit()')">希望を送信する</button>`;
+          reqBox.innerHTML = recruitMessageHtml + priorityHintHtml + reqHtml + htmlFoot + `<div style="font-size:12px; font-weight:800; color:#888; margin-bottom:4px;">コメント</div><textarea id="shift-comment" rows="3" placeholder="店長への共有事項があれば記入してください">${commentText}</textarea><button class="btn-main" style="margin-top:15px;" onclick="openConfirmModal('提出確認', '店長に送信しますか？', '送信', 'executeSubmit()')">希望を送信する</button>`;
         } else {
           let reasonMsg = isAdjusting ? "現在、店長がシフトを調整中です。" : "この募集は締め切られました。";
-          reqBox.innerHTML = `<div style="text-align:center; padding:20px; color:var(--red); font-weight:900;">${reasonMsg}<br><br><span style="font-size:12px; color:#888;">提出内容は「📥 提出内容」タブから確認できます。</span></div>`;
+          reqBox.innerHTML = recruitMessageHtml + priorityHintHtml + `<div style="text-align:center; padding:20px; color:var(--red); font-weight:900;">${reasonMsg}<br><br><span style="font-size:12px; color:#888;">提出内容は「📥 提出内容」タブから確認できます。</span></div>`;
         }
         
         subBox.innerHTML = subHtml + htmlFoot;
