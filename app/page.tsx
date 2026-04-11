@@ -53,6 +53,7 @@ const googleAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_AUTH !== "false"
 const directTestBypassEnabled =
   process.env.NEXT_PUBLIC_ENABLE_DIRECT_TEST_BYPASS === "true";
 const googleAuthUiEnabled = googleAuthEnabled && !directTestBypassEnabled;
+const directEmbedMode = directTestBypassEnabled && !googleAuthUiEnabled;
 const directTestBypassToken =
   process.env.NEXT_PUBLIC_DIRECT_TEST_BYPASS_TOKEN ||
   "cafe-shift-direct-8f3c27d4a91b";
@@ -281,7 +282,7 @@ export default function Page() {
   };
 
   return (
-    <main className="page">
+    <main className={`page${directEmbedMode ? " pageEmbed" : ""}`}>
       {googleAuthUiEnabled ? (
         <Script
           src="https://accounts.google.com/gsi/client"
@@ -320,25 +321,21 @@ export default function Page() {
         </section>
       ) : (
         <section className="appShell">
-          {directTestBypassEnabled ? (
-            <section className="notice" style={{ marginBottom: 12 }}>
-              <h2>テストモード</h2>
-              <p>Google認証をバイパスして GAS を直接表示しています。</p>
-            </section>
-          ) : null}
           <form ref={bootstrapFormRef} action={gasUrl} method="post" target="gas-app-frame" hidden>
             <input type="hidden" name="bootstrapSessionToken" value={sessionToken} />
             <input type="hidden" name="view" value={iframeView} />
           </form>
-          <button type="button" onClick={handleSignOut} className="floatingSignOut">
-            {directTestBypassEnabled ? "Reload Test" : "Sign out"}
-          </button>
+          {googleAuthUiEnabled ? (
+            <button type="button" onClick={handleSignOut} className="floatingSignOut">
+              Sign out
+            </button>
+          ) : null}
           <iframe
             ref={iframeRef}
             name="gas-app-frame"
             src={directTestIframeUrl}
-            title="GAS Web App"
-            className="frame frameFullscreen"
+            title={directEmbedMode ? "Shift App" : "GAS Web App"}
+            className={`frame frameFullscreen${directEmbedMode ? " frameDirectEmbed" : ""}`}
             loading="lazy"
             allow="clipboard-read; clipboard-write"
             referrerPolicy="no-referrer"

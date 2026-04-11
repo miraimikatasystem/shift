@@ -29,6 +29,11 @@ body {
   grid-template-rows: 1fr;
 }
 
+.pageEmbed {
+  padding: 0;
+  gap: 0;
+}
+
 .notice,
 .frameWrap {
   background: var(--surface);
@@ -82,10 +87,20 @@ body {
   min-height: calc(100dvh - 48px);
 }
 
+.pageEmbed .appShell {
+  min-height: 100dvh;
+}
+
 .frameFullscreen {
   min-height: calc(100dvh - 48px);
   border-radius: 18px;
   box-shadow: 0 24px 60px rgba(24, 41, 74, 0.12);
+}
+
+.frameDirectEmbed {
+  min-height: 100dvh;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .floatingSignOut {
@@ -108,6 +123,10 @@ body {
     padding: 10px;
   }
 
+  .pageEmbed {
+    padding: 0;
+  }
+
   .frame {
     min-height: calc(100dvh - 20px);
   }
@@ -115,5 +134,10 @@ body {
   .frameFullscreen {
     min-height: calc(100dvh - 20px);
     border-radius: 14px;
+  }
+
+  .frameDirectEmbed {
+    min-height: 100dvh;
+    border-radius: 0;
   }
 }
